@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Objectiv — Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: ui-sans-serif, system-ui, sans-serif; }
+    body { background: #1a1a1a; color: #e5e5e5; }
+    .app { display: flex; height: 100%; }
+    .sidebar {
+      width: 48px; min-width: 48px; background: #252526;
+      display: flex; flex-direction: column; align-items: center; padding-top: 8px; gap: 4px;
+    }
+    .sidebar button {
+      width: 40px; height: 40px; border: none; background: transparent; color: #007acc;
+      cursor: pointer; border-radius: 6px; font-size: 18px;
+    }
+    .sidebar button:hover { background: #2d2d2d; color: #fff; }
+    .panel {
+      width: 320px; min-width: 280px; background: #252526; border-right: 1px solid #333;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .panel-header {
+      padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: #888; border-bottom: 1px solid #333;
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .chat-msg {
+      max-width: 90%; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5;
+    }
+    .chat-msg.user { align-self: flex-end; background: #0e639c; color: #fff; }
+    .chat-msg.assistant { align-self: flex-start; background: #2d2d2d; color: #e5e5e5; }
+    .chat-form {
+      padding: 12px; border-top: 1px solid #333; display: flex; gap: 8px;
+    }
+    .chat-form input {
+      flex: 1; padding: 10px 12px; border: 1px solid #444; border-radius: 6px;
+      background: #1e1e1e; color: #e5e5e5; font-size: 13px;
+    }
+    .chat-form button {
+      padding: 10px 16px; background: #0e639c; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    .editor-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .editor-wrap {
+      flex: 1; min-height: 0; background: #1e1e1e;
+      padding: 16px; overflow: auto;
+    }
+    .editor-wrap pre {
+      margin: 0; font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 14px;
+      line-height: 1.5; color: #d4d4d4;
+    }
+    .editor-wrap .comment { color: #6a9955; }
+    .editor-wrap .keyword { color: #569cd6; }
+    .editor-wrap .string { color: #ce9178; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <button title="Chat">💬</button>
+    </div>
+    <div class="panel">
+      <div class="panel-header">Chat (Ollama)</div>
+      <div class="chat-messages">
+        <div class="chat-msg user">Explain this function in one line.</div>
+        <div class="chat-msg assistant">It returns the string "Hello, Objectiv" — a simple greeting function.</div>
+        <div class="welcome" style="padding: 24px; color: #888; font-size: 14px;">
+          Chat with Ollama. Start the backend: <code style="background:#333;padding:2px 6px;border-radius:4px;">cd backend && python main.py</code>
+        </div>
+      </div>
+      <form class="chat-form" onsubmit="return false;">
+        <input type="text" placeholder="Ask anything..." />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <div class="editor-area">
+      <div class="editor-wrap">
+        <pre><span class="comment">// Objectiv — IDE shell</span>
+<span class="comment">// Powered by Ollama</span>
+
+<span class="keyword">function</span> hello() {
+  <span class="keyword">return</span> <span class="string">"Hello, Objectiv"</span>;
+}</pre>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

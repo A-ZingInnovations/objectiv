@@ -1,0 +1,38 @@
+[package]
+name = "objectiv-desktop"
+version = "0.1.0"
+description = "Objectiv desktop app"
+authors = ["A-Zing"]
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "objectiv_desktop_lib"
+crate-type = ["lib", "cdylib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+portable-pty = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+notify = { version = "6.1", features = ["macos_fsevent"] }
+regex = "1"
+globset = "0.4"
+tauri-plugin-deep-link = "2"
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+uuid = { version = "1", features = ["v4"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2.0.0-beta.0", features = ["deep-link"] }

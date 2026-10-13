@@ -1,0 +1,12 @@
+{
+  "name": "objectiv",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "npm run dev --prefix app",
+    "dev:backend": "python backend/main.py",
+    "dev:desktop": "npm run dev --prefix desktop",
+    "build": "npm run build --prefix app",
+    "build:desktop": "npm run build --prefix app && npm run build --prefix desktop"
+  }
+}

@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+app/dist/
+app/.env.local
+app/tsconfig.tsbuildinfo
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+backend/__pycache__/
+backend/.venv/
+*.pyc
+.objective/

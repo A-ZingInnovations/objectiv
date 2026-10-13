@@ -1,0 +1,16 @@
+{
+  "name": "objectiv-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "icons": "bash ../scripts/regenerate-objectiv-app-icons.sh",
+    "build": "tauri build",
+    "relaunch": "bash ../scripts/objectiv-relaunch.sh",
+    "stop": "bash ../scripts/objectiv-stop-all.sh"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}
