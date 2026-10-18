@@ -29,10 +29,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get(
-        "OBJECTIV_CORS_ORIGINS",
-        os.environ.get("AZIAI_CORS_ORIGINS", "*"),
-    ).split(","),
+    allow_origins=os.environ.get("OBJECTIV_CORS_ORIGINS", "*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -125,7 +122,7 @@ full new file content here
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "aziai-backend", "version": "0.1.0", "ollama": OLLAMA_BASE_URL}
+    return {"status": "ok", "service": "objectiv-backend", "version": "0.1.0", "ollama": OLLAMA_BASE_URL}
 
 
 @app.post("/v1/chat", response_model=ChatResponse)
@@ -216,5 +213,5 @@ def _agent_ollama(req: AgentRequest) -> AgentResponse:
 
 if __name__ == "__main__":
     import uvicorn
-    from config import AZIAI_HOST, AZIAI_PORT
-    uvicorn.run(app, host=AZIAI_HOST, port=AZIAI_PORT)
+    from config import OBJECTIV_HOST, OBJECTIV_PORT
+    uvicorn.run(app, host=OBJECTIV_HOST, port=OBJECTIV_PORT)

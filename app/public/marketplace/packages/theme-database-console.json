@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "id": "objectiv.theme.database-console",
+    "name": "Database Console",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "High-contrast SQL console palette inspired by database IDE themes.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#22c55e",
+      "cssVars": {
+        "--editor-bg": "#0f1419",
+        "--editor-fg": "#e7ecf1",
+        "--side-bar-bg": "#151b23",
+        "--activity-bar-bg": "#0f1419",
+        "--tab-active-bg": "#1a2332",
+        "--tab-inactive-bg": "#0f1419",
+        "--status-bar-bg": "#151b23",
+        "--objectiv-accent": "#22c55e"
+      }
+    }
+  }
+}

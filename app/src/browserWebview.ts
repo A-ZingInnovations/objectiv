@@ -13,6 +13,13 @@ type SessionTrack = {
 const sessions = new Map<string, SessionTrack>();
 
 /** Tauri window + webview label for a browser session tab id. */
+const CHROME_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+function isMeetingSession(sessionId: string): boolean {
+  return sessionId.startsWith('meeting:');
+}
+
 export function browserWebviewLabel(sessionId: string): string {
   const safe = sessionId.replace(/[^a-zA-Z0-9/_:-]/g, '_');
   return `obw-${safe}`.slice(0, 96);
@@ -111,9 +118,10 @@ async function ensureBrowserWindow(
       minimizable: false,
       shadow: false,
       visible: true,
-      focus: false,
+      focus: isMeetingSession(sessionId),
       skipTaskbar: true,
-      title: 'Browser',
+      title: isMeetingSession(sessionId) ? 'Meeting' : 'Browser',
+      ...(isMeetingSession(sessionId) ? { userAgent: CHROME_UA } : {}),
     });
     await waitWindowCreated(win);
     return win;
@@ -138,6 +146,14 @@ export async function hideAllBrowserWebviews(): Promise<void> {
 }
 
 /** Tear down native browser window for a closed browser tab. */
+/** Focus embedded browser (e.g. after joining a meeting). */
+export async function focusBrowserWebview(sessionId: string): Promise<void> {
+  if (!isTauriDesktop()) return;
+  const label = browserWebviewLabel(sessionId);
+  const win = await getBrowserWindow(label);
+  if (win) await win.setFocus().catch(() => {});
+}
+
 export async function destroyBrowserWebview(sessionId: string): Promise<void> {
   if (!isTauriDesktop()) return;
   sessions.delete(sessionId);
@@ -216,32 +232,4 @@ export async function syncBrowserWebview(opts: BrowserWebviewSync): Promise<void
   }
 
   await existing.show();
-}
-
-export async function browserStopLoading(sessionId: string): Promise<void> {
-  if (!isTauriDesktop()) return;
-  const label = browserWebviewLabel(sessionId);
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('objectiv_browser_stop', { label }).catch(() => {});
-}
-
-export async function browserEval(sessionId: string, script: string): Promise<void> {
-  if (!isTauriDesktop()) return;
-  const label = browserWebviewLabel(sessionId);
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('objectiv_browser_eval', { label, script }).catch(() => {});
-}
-
-export async function browserFindInPage(
-  sessionId: string,
-  query: string,
-  forward: boolean,
-): Promise<void> {
-  const escaped = query.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
-  const script = `window.find('${escaped}', false, ${forward ? 'false' : 'true'}, true, false, true, false);`;
-  await browserEval(sessionId, script);
-}
-
-export async function browserPrintPage(sessionId: string): Promise<void> {
-  await browserEval(sessionId, 'window.print();');
 }

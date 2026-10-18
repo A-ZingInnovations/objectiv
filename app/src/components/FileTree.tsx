@@ -41,6 +41,8 @@ type Props = ExplorerActions & {
   isRootTrusted?: (root: string) => boolean;
   /** Hide EXPLORER chrome when nested under ExplorerSidePanel. */
   embedded?: boolean;
+  /** Parent renders empty state (ExplorerSidePanel composite). */
+  hideEmptyWelcome?: boolean;
 };
 
 type CtxPayload =
@@ -657,6 +659,7 @@ export default function FileTree({
   busy,
   isRootTrusted,
   embedded,
+  hideEmptyWelcome,
 }: Props) {
   const empty = workspaceRoots.length === 0;
   const demoTree = !diskMode && filePaths.length > 0 ? getTree(filePaths) : null;
@@ -795,7 +798,7 @@ export default function FileTree({
       )}
 
       <div className="side-bar-scroll">
-        {empty && (
+        {empty && !hideEmptyWelcome && (
           <ExplorerWelcome
             onOpenFolder={onOpenFolder}
             onCloneRepository={onCloneRepository}

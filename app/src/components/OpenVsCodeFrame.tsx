@@ -1,9 +1,16 @@
+import { isTauriDesktop } from '../desktopWorkspace';
+import { useObjectivOpenVsCodeWebview } from '../useObjectivOpenVsCodeWebview';
+
 type Props = {
   url: string;
+  active?: boolean;
   onBack: () => void;
 };
 
-export default function OpenVsCodeFrame({ url, onBack }: Props) {
+export default function OpenVsCodeFrame({ url, active = true, onBack }: Props) {
+  const useNative = isTauriDesktop();
+  const hostRef = useObjectivOpenVsCodeWebview(url, useNative && active);
+
   return (
     <div className="openvscode-shell">
       <div className="openvscode-toolbar">
@@ -12,7 +19,17 @@ export default function OpenVsCodeFrame({ url, onBack }: Props) {
         </button>
         <span className="openvscode-toolbar-label">OpenVSCode Server</span>
       </div>
-      <iframe className="openvscode-frame" src={url} title="OpenVSCode Server" />
+      {useNative ? (
+        <div ref={hostRef} className="openvscode-frame-host" aria-label="OpenVSCode Server" />
+      ) : (
+        <iframe
+          className="openvscode-frame"
+          src={url}
+          title="OpenVSCode Server"
+          allow="clipboard-read; clipboard-write; fullscreen"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      )}
     </div>
   );
 }

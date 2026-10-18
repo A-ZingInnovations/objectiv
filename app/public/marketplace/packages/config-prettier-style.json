@@ -1,0 +1,19 @@
+{
+  "manifest": {
+    "id": "objectiv.config.prettier-defaults",
+    "name": "Prettier-friendly defaults",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Editor defaults aligned with Prettier (tab width, format on save).",
+    "kind": "config",
+    "contributes": {
+      "editor": {
+        "tabSize": 2,
+        "insertSpaces": true,
+        "formatOnSave": true,
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true
+      }
+    }
+  }
+}

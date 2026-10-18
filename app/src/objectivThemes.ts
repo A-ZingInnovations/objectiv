@@ -24,7 +24,7 @@ export const WORKBENCH_COLOR_THEME_LABELS: Record<WorkbenchColorThemeId, string>
 
 export const ACCENT_PRESETS: { id: string; label: string; hex: string }[] = [
   { id: 'default', label: 'Theme default', hex: '' },
-  { id: 'brand', label: 'Brand', hex: '#0a8083' },
+  { id: 'teal', label: 'Teal', hex: '#2dd4bf' },
   { id: 'blue', label: 'Blue', hex: '#007acc' },
   { id: 'sky', label: 'Sky', hex: '#38bdf8' },
   { id: 'violet', label: 'Violet', hex: '#a78bfa' },
@@ -159,12 +159,12 @@ const LIGHT_PLUS: ThemeVars = {
 };
 
 const PRESETS: Preset[] = [
-  { id: 'dark-plus', base: 'dark', accentDefault: '#0a8083', vars: { ...DARK_PLUS } },
-  { id: 'light-plus', base: 'light', accentDefault: '#0a8083', vars: { ...LIGHT_PLUS } },
+  { id: 'dark-plus', base: 'dark', accentDefault: '#007acc', vars: { ...DARK_PLUS } },
+  { id: 'light-plus', base: 'light', accentDefault: '#007acc', vars: { ...LIGHT_PLUS } },
   {
     id: 'objectiv-teal',
     base: 'dark',
-    accentDefault: '#0a8083',
+    accentDefault: '#2dd4bf',
     vars: {
       ...DARK_PLUS,
       '--side-bar-bg': '#1a2224',

@@ -1,62 +1,47 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import type { Bookmark, BrowserSession } from '../browser';
-import { urlSecurity } from '../browser';
-import { browserFindInPage, browserPrintPage } from '../browserWebview';
+import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import SideBarSection from './SideBarSection';
+import type { BrowserSession } from '../browser';
+import {
+  BROWSER_AUTOMATION_FIXTURES,
+  BROWSER_START_LINKS,
+  browserFixtureUrl,
+  type BrowserFixtureId,
+} from '../browserPages';
 import { isTauriDesktop } from '../desktopWorkspace';
 import { useObjectivBrowserWebview } from '../useObjectivBrowserWebview';
 
 type Props = {
   session: BrowserSession;
   bookmarked: boolean;
-  bookmarks: Bookmark[];
-  recentHistory: { url: string; title: string }[];
   onNavigate: (url: string) => void;
   onInputChange: (value: string) => void;
   onBack: () => void;
   onForward: () => void;
   onReload: () => void;
-  onStop: () => void;
-  onHome: () => void;
   onToggleBookmark: () => void;
-  onCopyUrl: () => void;
-  onOpenExternal: () => void;
-  onPageLoaded: (title?: string) => void;
-  onZoom: (delta: number) => void;
-  onZoomReset: () => void;
-  onClearSiteData: () => void;
   onToggleDevtools?: () => void;
+  onOpenFixture?: (id: BrowserFixtureId) => void;
+  /** Open Extensions activity (marketplace installs). */
+  onOpenExtensions?: () => void;
+  /** Hide native webview when another editor surface covers the workbench. */
   webviewActive?: boolean;
 };
 
 export default function BrowserView({
   session,
   bookmarked,
-  bookmarks,
-  recentHistory,
   onNavigate,
   onInputChange,
   onBack,
   onForward,
   onReload,
-  onStop,
-  onHome,
   onToggleBookmark,
-  onCopyUrl,
-  onOpenExternal,
-  onPageLoaded,
-  onZoom,
-  onZoomReset,
-  onClearSiteData,
   onToggleDevtools,
+  onOpenFixture,
+  onOpenExtensions,
   webviewActive = true,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [findOpen, setFindOpen] = useState(false);
-  const [findQuery, setFindQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
   const useNativeWebview = isTauriDesktop();
   const frameHostRef = useObjectivBrowserWebview({
     sessionId: session.id,
@@ -64,39 +49,9 @@ export default function BrowserView({
     reloadToken: session.reloadToken,
     active: webviewActive && useNativeWebview && session.url !== 'about:blank',
   });
-
   const canBack = session.historyIndex > 0;
   const canForward = session.historyIndex < session.history.length - 1;
   const canDevtools = useNativeWebview && Boolean(onToggleDevtools);
-  const onStartPage = session.url === 'about:blank';
-  const security = urlSecurity(session.url);
-  const loading = session.loading ?? false;
-  const zoom = session.zoom ?? 1;
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
-
-  useEffect(() => {
-    function onFindHotkey(e: KeyboardEvent) {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'f') return;
-      if (!webviewActive) return;
-      e.preventDefault();
-      setFindOpen(true);
-    }
-    window.addEventListener('keydown', onFindHotkey as unknown as EventListener);
-    return () => window.removeEventListener('keydown', onFindHotkey as unknown as EventListener);
-  }, [webviewActive]);
-
-  useEffect(() => {
-    if (onStartPage) return;
-    const t = window.setTimeout(() => onPageLoaded(), 2500);
-    return () => window.clearTimeout(t);
-  }, [session.url, session.reloadToken, onStartPage, onPageLoaded]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -105,67 +60,23 @@ export default function BrowserView({
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') inputRef.current?.blur();
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
-      e.preventDefault();
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
   }
 
-  function runFind(forward: boolean) {
-    const q = findQuery.trim();
-    if (!q) return;
-    if (useNativeWebview) {
-      void browserFindInPage(session.id, q, forward);
-      return;
-    }
-    try {
-      const win = iframeRef.current?.contentWindow as
-        | (Window & {
-            find?: (
-              query: string,
-              caseSensitive: boolean,
-              backwards: boolean,
-              wrap: boolean,
-              wholeWord: boolean,
-              searchInFrames: boolean,
-              showDialog: boolean,
-            ) => boolean;
-          })
-        | null
-        | undefined;
-      win?.find?.(q, false, !forward, true, false, true, false);
-    } catch {
-      /* cross-origin */
-    }
-  }
-
-  function onIframeLoad() {
-    let title: string | undefined;
-    try {
-      title = iframeRef.current?.contentDocument?.title || undefined;
-    } catch {
-      title = undefined;
-    }
-    onPageLoaded(title);
-  }
-
-  const securityIcon =
-    security === 'secure'
-      ? 'codicon-lock'
-      : security === 'insecure'
-        ? 'codicon-unlock'
-        : security === 'local'
-          ? 'codicon-server'
-          : 'codicon-globe';
-
-  const zoomPct = Math.round(zoom * 100);
+  const onStartPage = session.url === 'about:blank';
+  const [objectivOpen, setObjectivOpen] = useState(true);
+  const [automationOpen, setAutomationOpen] = useState(false);
 
   return (
     <div className="browser-view">
       <div className="browser-chrome">
         <div className="browser-chrome-nav" role="group" aria-label="Navigation">
-          <button type="button" className="browser-btn" title="Back" disabled={!canBack} onClick={onBack}>
+          <button
+            type="button"
+            className="browser-btn"
+            title="Back"
+            disabled={!canBack}
+            onClick={onBack}
+          >
             <span className="codicon codicon-arrow-left" aria-hidden />
           </button>
           <button
@@ -177,25 +88,12 @@ export default function BrowserView({
           >
             <span className="codicon codicon-arrow-right" aria-hidden />
           </button>
-          <button type="button" className="browser-btn" title="Home" onClick={onHome}>
-            <span className="codicon codicon-home" aria-hidden />
+          <button type="button" className="browser-btn" title="Reload (⌘R)" onClick={onReload}>
+            <span className="codicon codicon-refresh" aria-hidden />
           </button>
-          {loading ? (
-            <button type="button" className="browser-btn" title="Stop" onClick={onStop}>
-              <span className="codicon codicon-debug-stop" aria-hidden />
-            </button>
-          ) : (
-            <button type="button" className="browser-btn" title="Reload (⌘R)" onClick={onReload}>
-              <span className="codicon codicon-refresh" aria-hidden />
-            </button>
-          )}
         </div>
         <form className="browser-url-form" onSubmit={submit}>
-          <span
-            className={`browser-url-icon codicon ${securityIcon} browser-url-security-${security}`}
-            aria-hidden
-            title={security}
-          />
+          <span className="browser-url-icon codicon codicon-globe" aria-hidden />
           <input
             ref={inputRef}
             className="browser-url"
@@ -208,24 +106,8 @@ export default function BrowserView({
             autoCorrect="off"
             aria-label="Address"
           />
-          {loading && <span className="browser-url-loading codicon codicon-loading spin" aria-hidden />}
         </form>
         <div className="browser-chrome-actions" role="group" aria-label="Page actions">
-          <button
-            type="button"
-            className="browser-btn"
-            title="Find in page (⌘F)"
-            onClick={() => setFindOpen((v) => !v)}
-          >
-            <span className="codicon codicon-search" aria-hidden />
-          </button>
-          <button type="button" className="browser-btn" title="Zoom out" onClick={() => onZoom(-0.1)}>
-            <span className="codicon codicon-zoom-out" aria-hidden />
-          </button>
-          <span className="browser-zoom-label">{zoomPct}%</span>
-          <button type="button" className="browser-btn" title="Zoom in" onClick={() => onZoom(0.1)}>
-            <span className="codicon codicon-zoom-in" aria-hidden />
-          </button>
           {canDevtools && (
             <button
               type="button"
@@ -247,88 +129,8 @@ export default function BrowserView({
               aria-hidden
             />
           </button>
-          <div className="browser-menu-wrap" ref={menuRef}>
-            <button
-              type="button"
-              className="browser-btn"
-              title="Menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <span className="codicon codicon-ellipsis" aria-hidden />
-            </button>
-            {menuOpen && (
-              <div className="browser-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { onCopyUrl(); setMenuOpen(false); }}>
-                  Copy link
-                </button>
-                <button type="button" role="menuitem" onClick={() => { onOpenExternal(); setMenuOpen(false); }}>
-                  Open in system browser
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onZoomReset();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Reset zoom
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    if (useNativeWebview) void browserPrintPage(session.id);
-                    else iframeRef.current?.contentWindow?.print();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Print…
-                </button>
-                <div className="browser-menu-sep" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="danger"
-                  onClick={() => {
-                    onClearSiteData();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Clear bookmarks, history & downloads
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-
-      {findOpen && (
-        <div className="browser-find">
-          <input
-            className="browser-find-input"
-            value={findQuery}
-            onChange={(e) => setFindQuery(e.target.value)}
-            placeholder="Find in page"
-            aria-label="Find in page"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') runFind(!e.shiftKey);
-              if (e.key === 'Escape') setFindOpen(false);
-            }}
-          />
-          <button type="button" className="browser-btn" title="Previous" onClick={() => runFind(false)}>
-            <span className="codicon codicon-arrow-up" aria-hidden />
-          </button>
-          <button type="button" className="browser-btn" title="Next" onClick={() => runFind(true)}>
-            <span className="codicon codicon-arrow-down" aria-hidden />
-          </button>
-          <button type="button" className="browser-btn" title="Close" onClick={() => setFindOpen(false)}>
-            <span className="codicon codicon-close" aria-hidden />
-          </button>
-        </div>
-      )}
-
       {onStartPage ? (
         <div className="browser-start">
           <div className="browser-start-bg" aria-hidden />
@@ -353,69 +155,89 @@ export default function BrowserView({
                 ↵
               </kbd>
             </form>
-            {bookmarks.length > 0 && (
-              <div className="browser-start-quick">
-                <span className="browser-start-quick-label">Bookmarks</span>
-                <div className="browser-start-tiles">
-                  {bookmarks.slice(0, 12).map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      className="browser-start-tile"
-                      onClick={() => onNavigate(b.url)}
-                    >
-                      <span className="codicon codicon-bookmark" aria-hidden />
-                      <span className="browser-start-tile-label">{b.title}</span>
-                    </button>
+            <div className="browser-start-sections">
+              <SideBarSection
+                title="Objectiv"
+                open={objectivOpen}
+                onToggle={() => setObjectivOpen((v) => !v)}
+              >
+                <ul className="sidebar-section-list browser-start-links">
+                  {onOpenExtensions && (
+                    <li>
+                      <button
+                        type="button"
+                        className="sidebar-section-item"
+                        title="Install themes, snippets, and config in the Extensions side bar"
+                        onClick={onOpenExtensions}
+                      >
+                        <span className="codicon codicon-extensions sidebar-section-item-icon" aria-hidden />
+                        <span className="sidebar-section-item-label">Extensions</span>
+                      </button>
+                    </li>
+                  )}
+                  {BROWSER_START_LINKS.map((link) => (
+                    <li key={link.id}>
+                      <button
+                        type="button"
+                        className="sidebar-section-item"
+                        title={link.description}
+                        aria-label={link.label}
+                        onClick={() => onNavigate(link.url)}
+                      >
+                        <span className={`codicon ${link.icon} sidebar-section-item-icon`} aria-hidden />
+                        <span className="sidebar-section-item-label">{link.shortLabel}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
-              </div>
-            )}
-            {recentHistory.length > 0 && (
-              <div className="browser-start-quick">
-                <span className="browser-start-quick-label">Recent</span>
-                <div className="browser-start-tiles">
-                  {recentHistory.slice(0, 8).map((h) => (
-                    <button
-                      key={h.url}
-                      type="button"
-                      className="browser-start-tile"
-                      onClick={() => onNavigate(h.url)}
-                    >
-                      <span className="codicon codicon-history" aria-hidden />
-                      <span className="browser-start-tile-label">{h.title}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+                </ul>
+              </SideBarSection>
+              {onOpenFixture && (
+                <SideBarSection
+                  title="Automation Samples"
+                  open={automationOpen}
+                  onToggle={() => setAutomationOpen((v) => !v)}
+                >
+                  <ul className="sidebar-section-list browser-start-links">
+                    {BROWSER_AUTOMATION_FIXTURES.map((f) => (
+                      <li key={f.id}>
+                        <button
+                          type="button"
+                          className="sidebar-section-item"
+                          title={`${f.description} (${f.shortcut})`}
+                          aria-label={f.label}
+                          onClick={() => onOpenFixture(f.id)}
+                        >
+                          <span className={`codicon ${f.icon} sidebar-section-item-icon`} aria-hidden />
+                          <span className="sidebar-section-item-label">{f.shortLabel}</span>
+                          <kbd className="browser-start-link-kbd">{f.shortcut}</kbd>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </SideBarSection>
+              )}
+            </div>
           </div>
         </div>
-      ) : (
+      ) : useNativeWebview ? (
         <div
-          className="browser-frame-scaler"
-          style={{ zoom }}
-        >
-          {useNativeWebview ? (
-            <div
-              ref={frameHostRef}
-              className="browser-frame-host"
-              aria-label={session.title}
-              data-url={session.url}
-            />
-          ) : (
-            <iframe
-              ref={iframeRef}
-              key={`${session.id}-${session.reloadToken}-${session.url}`}
-              className="browser-frame"
-              src={session.url}
-              title={session.title}
-              referrerPolicy="no-referrer-when-downgrade"
-              onLoad={onIframeLoad}
-            />
-          )}
-        </div>
+          ref={frameHostRef}
+          className="browser-frame-host"
+          aria-label={session.title}
+          data-url={session.url}
+        />
+      ) : (
+        <iframe
+          key={`${session.id}-${session.reloadToken}-${session.url}`}
+          className="browser-frame"
+          src={session.url}
+          title={session.title}
+          referrerPolicy="no-referrer-when-downgrade"
+        />
       )}
     </div>
   );
 }
+
+/** Resolve fixture URL for e2e or docs. */
+export { browserFixtureUrl };

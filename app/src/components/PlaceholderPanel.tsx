@@ -9,7 +9,7 @@ type Props = {
 const COPY: Partial<Record<ActivityPanel, string>> = {
   search: 'Workspace search (ripgrep) — Phase C.',
   run: 'Run and debug — Phase C.',
-  extensions: 'Open Extensions in the activity bar.',
+  extensions: 'Extension marketplace is VS Code / Cursor + Objective extension.',
   settings: 'Settings — Phase C.',
 };
 

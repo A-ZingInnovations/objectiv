@@ -1,0 +1,566 @@
+{
+  "version": 2,
+  "updated": "2026-10-07T2",
+  "catalogUrl": "https://marketplace.project-objectiv.com/catalog.json",
+  "entries": [
+    {
+      "id": "azing.theme.objectiv-ocean",
+      "name": "Objectiv Ocean",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Cool ocean workbench palette for Objectiv.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/ocean.svg",
+      "packageUrl": "packages/objectiv-ocean.json",
+      "about": "Cool ocean workbench palette for Objectiv. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/azing-theme-objectiv-ocean.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.dracula-theme",
+      "name": "Dracula (VS Code port)",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Dracula palette ported from the VS Code theme.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/theme.svg",
+      "packageUrl": "packages/theme-dracula.json",
+      "about": "Dracula palette ported from the VS Code theme. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-dracula-theme.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.github-dark",
+      "name": "GitHub Dark (VS Code port)",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "GitHub Dark Default–inspired shell.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/theme.svg",
+      "packageUrl": "packages/theme-github-dark.json",
+      "about": "GitHub Dark Default–inspired shell. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-github-dark.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.one-dark-pro",
+      "name": "One Dark Pro (VS Code port)",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "One Dark Pro–style overlay.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/theme.svg",
+      "packageUrl": "packages/theme-one-dark-pro.json",
+      "about": "One Dark Pro–style overlay. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-one-dark-pro.svg"
+      ]
+    },
+    {
+      "id": "azing.theme.objectiv-ember-accent",
+      "name": "Ember Accent",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Warm ember accent on your current theme.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/ember.svg",
+      "packageUrl": "packages/ember-accent.json",
+      "about": "Warm ember accent on your current theme. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/azing-theme-objectiv-ember-accent.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.javascript-snippets",
+      "name": "JavaScript Essentials",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "JS/TS snippets ported from VS Code.",
+      "categories": [
+        "Snippets"
+      ],
+      "icon": "icons/python.svg",
+      "packageUrl": "packages/snippets-javascript.json",
+      "about": "JS/TS snippets ported from VS Code. Includes 3 snippet templates for the Monaco editor in Objectiv.",
+      "howToAccess": [
+        "Open Objectiv desktop with a project folder.",
+        "Extensions → find this pack → Install → Enabled.",
+        "Open a source file matching the snippet language.",
+        "Use the editor snippet picker (or type the snippet prefix) to insert templates."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-javascript-snippets.svg"
+      ]
+    },
+    {
+      "id": "azing.snippets.python-starter",
+      "name": "Python Starter Snippets",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Common Python scaffolding snippets.",
+      "categories": [
+        "Snippets"
+      ],
+      "icon": "icons/python.svg",
+      "packageUrl": "packages/python-snippets.json",
+      "about": "Common Python scaffolding snippets. Includes 2 snippet templates for the Monaco editor in Objectiv.",
+      "howToAccess": [
+        "Open Objectiv desktop with a project folder.",
+        "Extensions → find this pack → Install → Enabled.",
+        "Open a source file matching the snippet language.",
+        "Use the editor snippet picker (or type the snippet prefix) to insert templates."
+      ],
+      "screenshots": [
+        "screenshots/azing-snippets-python-starter.svg"
+      ]
+    },
+    {
+      "id": "objectiv.config.prettier-defaults",
+      "name": "Prettier-friendly defaults",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Tab size, format on save, trailing whitespace.",
+      "categories": [
+        "Config"
+      ],
+      "icon": "icons/icons.svg",
+      "packageUrl": "packages/config-prettier-style.json",
+      "about": "Tab size, format on save, trailing whitespace. Merges recommended editor settings into Objectiv while the pack is enabled—no separate config file required.",
+      "howToAccess": [
+        "Open Objectiv desktop.",
+        "Extensions → Install this config pack → Enabled.",
+        "Editor settings (tabs, format on save, wrap) apply to your workspace.",
+        "Review Settings → Editor to see merged values."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-config-prettier-defaults.svg"
+      ]
+    },
+    {
+      "id": "azing.theme.objectiv-violet",
+      "name": "Objectiv Violet",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Built-in violet workbench theme with soft purple accent.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/violet.svg",
+      "packageUrl": "packages/theme-objectiv-violet.json",
+      "about": "Built-in violet workbench theme with soft purple accent. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/azing-theme-objectiv-violet.svg"
+      ]
+    },
+    {
+      "id": "azing.theme.objectiv-graphite",
+      "name": "Objectiv Graphite",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Neutral graphite shell for long coding sessions.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/graphite.svg",
+      "packageUrl": "packages/theme-objectiv-graphite.json",
+      "about": "Neutral graphite shell for long coding sessions. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/azing-theme-objectiv-graphite.svg"
+      ]
+    },
+    {
+      "id": "objectiv.theme.nord-frost",
+      "name": "Nord Frost",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Arctic blue-gray palette inspired by Nord.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/nord.svg",
+      "packageUrl": "packages/theme-nord-frost.json",
+      "about": "Arctic blue-gray palette inspired by Nord. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-theme-nord-frost.svg"
+      ]
+    },
+    {
+      "id": "objectiv.theme.solarized-dark",
+      "name": "Solarized Dark",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Classic Solarized dark base for editor and chrome.",
+      "categories": [
+        "Themes"
+      ],
+      "icon": "icons/solarized.svg",
+      "packageUrl": "packages/theme-solarized-dark.json",
+      "about": "Classic Solarized dark base for editor and chrome. This theme pack changes Objectiv workbench colors (sidebar, tabs, editor surface, and accent) when the extension is installed and enabled.",
+      "howToAccess": [
+        "Open Objectiv desktop and sign in to your workspace.",
+        "Activity bar → Extensions (marketplace).",
+        "Search for this extension → open it → Install.",
+        "Leave Enabled on. The theme applies to the workbench immediately.",
+        "Optional: Settings → Appearance to adjust theme or accent further."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-theme-solarized-dark.svg"
+      ]
+    },
+    {
+      "id": "azing.snippets.typescript-react",
+      "name": "TypeScript & React",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Hooks, components, and fetch helpers for TS/TSX.",
+      "categories": [
+        "Snippets"
+      ],
+      "icon": "icons/theme.svg",
+      "packageUrl": "packages/snippets-typescript-react.json",
+      "about": "Hooks, components, and fetch helpers for TS/TSX. Includes 3 snippet templates for the Monaco editor in Objectiv.",
+      "howToAccess": [
+        "Open Objectiv desktop with a project folder.",
+        "Extensions → find this pack → Install → Enabled.",
+        "Open a source file matching the snippet language.",
+        "Use the editor snippet picker (or type the snippet prefix) to insert templates."
+      ],
+      "screenshots": [
+        "screenshots/azing-snippets-typescript-react.svg"
+      ]
+    },
+    {
+      "id": "azing.snippets.rust-starter",
+      "name": "Rust Starter",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "fn main, tests, and Result boilerplate.",
+      "categories": [
+        "Snippets"
+      ],
+      "icon": "icons/rust.svg",
+      "packageUrl": "packages/snippets-rust-starter.json",
+      "about": "fn main, tests, and Result boilerplate. Includes 3 snippet templates for the Monaco editor in Objectiv.",
+      "howToAccess": [
+        "Open Objectiv desktop with a project folder.",
+        "Extensions → find this pack → Install → Enabled.",
+        "Open a source file matching the snippet language.",
+        "Use the editor snippet picker (or type the snippet prefix) to insert templates."
+      ],
+      "screenshots": [
+        "screenshots/azing-snippets-rust-starter.svg"
+      ]
+    },
+    {
+      "id": "azing.snippets.django-starter",
+      "name": "Django Starter",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Views, models, and URL patterns for Django projects.",
+      "categories": [
+        "Snippets"
+      ],
+      "icon": "icons/python.svg",
+      "packageUrl": "packages/snippets-django-starter.json",
+      "about": "Views, models, and URL patterns for Django projects. Includes 3 snippet templates for the Monaco editor in Objectiv.",
+      "howToAccess": [
+        "Open Objectiv desktop with a project folder.",
+        "Extensions → find this pack → Install → Enabled.",
+        "Open a source file matching the snippet language.",
+        "Use the editor snippet picker (or type the snippet prefix) to insert templates."
+      ],
+      "screenshots": [
+        "screenshots/azing-snippets-django-starter.svg"
+      ]
+    },
+    {
+      "id": "objectiv.config.python-black",
+      "name": "Python / Black defaults",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "4-space indents and format-on-save for Python-style projects.",
+      "categories": [
+        "Config"
+      ],
+      "icon": "icons/python.svg",
+      "packageUrl": "packages/config-python-black.json",
+      "about": "4-space indents and format-on-save for Python-style projects. Merges recommended editor settings into Objectiv while the pack is enabled—no separate config file required.",
+      "howToAccess": [
+        "Open Objectiv desktop.",
+        "Extensions → Install this config pack → Enabled.",
+        "Editor settings (tabs, format on save, wrap) apply to your workspace.",
+        "Review Settings → Editor to see merged values."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-config-python-black.svg"
+      ]
+    },
+    {
+      "id": "objectiv.config.writer-focus",
+      "name": "Writer focus",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Soft wrap and clean whitespace for notes and markdown.",
+      "categories": [
+        "Config"
+      ],
+      "icon": "icons/icons.svg",
+      "packageUrl": "packages/config-writer-focus.json",
+      "about": "Soft wrap and clean whitespace for notes and markdown. Merges recommended editor settings into Objectiv while the pack is enabled—no separate config file required.",
+      "howToAccess": [
+        "Open Objectiv desktop.",
+        "Extensions → Install this config pack → Enabled.",
+        "Editor settings (tabs, format on save, wrap) apply to your workspace.",
+        "Review Settings → Editor to see merged values."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-config-writer-focus.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.sql-database",
+      "name": "SQL Database Essentials",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Queries, joins, and DDL snippets for SQL and database work.",
+      "categories": [
+        "Database"
+      ],
+      "icon": "icons/database.svg",
+      "packageUrl": "packages/snippets-sql-database.json",
+      "about": "Queries, joins, and DDL snippets for SQL and database work. Ported from common VS Code database extension workflows; 3 Monaco snippet(s). Run queries via your DB client in the Objectiv terminal.",
+      "howToAccess": [
+        "Open Objectiv desktop with your repo or SQL files.",
+        "Extensions → Install → Enabled.",
+        "Open .sql or connection files in the editor; insert snippets from the picker.",
+        "Use the integrated terminal for psql/mysql clients against your hosts."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-sql-database.svg"
+      ]
+    },
+    {
+      "id": "objectiv.snippets.postgres-admin",
+      "name": "PostgreSQL Admin",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "psql-friendly snippets for roles, indexes, and explain plans.",
+      "categories": [
+        "Database"
+      ],
+      "icon": "icons/database.svg",
+      "packageUrl": "packages/snippets-postgres-admin.json",
+      "about": "psql-friendly snippets for roles, indexes, and explain plans. Ported from common VS Code database extension workflows; 3 Monaco snippet(s). Run queries via your DB client in the Objectiv terminal.",
+      "howToAccess": [
+        "Open Objectiv desktop with your repo or SQL files.",
+        "Extensions → Install → Enabled.",
+        "Open .sql or connection files in the editor; insert snippets from the picker.",
+        "Use the integrated terminal for psql/mysql clients against your hosts."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-snippets-postgres-admin.svg"
+      ]
+    },
+    {
+      "id": "objectiv.theme.database-console",
+      "name": "Database Console",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "High-contrast SQL console palette inspired by database IDE themes.",
+      "categories": [
+        "Database"
+      ],
+      "icon": "icons/database.svg",
+      "packageUrl": "packages/theme-database-console.json",
+      "about": "High-contrast SQL console palette inspired by database IDE themes. This theme pack changes Objectiv workbench colors for SQL and data tooling sessions.",
+      "howToAccess": [
+        "Open Objectiv desktop with your repo or SQL files.",
+        "Extensions → Install → Enabled.",
+        "Open .sql or connection files in the editor; insert snippets from the picker.",
+        "Use the integrated terminal for psql/mysql clients against your hosts."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-theme-database-console.svg"
+      ]
+    },
+    {
+      "id": "objectiv.config.database-editor",
+      "name": "Database file editor defaults",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Tab and whitespace defaults tuned for SQL, JSON, and YAML connection files.",
+      "categories": [
+        "Database"
+      ],
+      "icon": "icons/database.svg",
+      "packageUrl": "packages/config-database-editor.json",
+      "about": "Tab and whitespace defaults tuned for SQL, JSON, and YAML connection files. Merges recommended editor settings into Objectiv while the pack is enabled—no separate config file required.",
+      "howToAccess": [
+        "Open Objectiv desktop with your repo or SQL files.",
+        "Extensions → Install → Enabled.",
+        "Open .sql or connection files in the editor; insert snippets from the picker.",
+        "Use the integrated terminal for psql/mysql clients against your hosts."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-config-database-editor.svg"
+      ]
+    },
+    {
+      "id": "objectiv.snippets.ssh-config",
+      "name": "SSH Config & Remote Shell",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "OpenSSH config blocks and remote session commands (VS Code Remote–style workflows).",
+      "categories": [
+        "Remote"
+      ],
+      "icon": "icons/ssh.svg",
+      "packageUrl": "packages/snippets-ssh-config.json",
+      "about": "OpenSSH config blocks and remote session commands (VS Code Remote–style workflows). 3 snippet(s) for SSH, SFTP, and remote dev—use with Objectiv terminal and local OpenSSH (not the VS Code Remote extension host).",
+      "howToAccess": [
+        "Open Objectiv desktop; use the integrated terminal for SSH/SFTP/rsync.",
+        "Extensions → Install snippet or config packs → Enabled.",
+        "Edit ~/.ssh/config or deploy scripts; insert snippets from the picker.",
+        "Pair with your own keys and hosts—Objectiv does not replace VS Code Remote SSH."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-snippets-ssh-config.svg"
+      ]
+    },
+    {
+      "id": "objectiv.snippets.sftp-deploy",
+      "name": "SFTP & rsync Deploy",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Sync and SFTP one-liners for remote uploads (companion to Objectiv terminal).",
+      "categories": [
+        "Remote"
+      ],
+      "icon": "icons/sftp.svg",
+      "packageUrl": "packages/snippets-sftp-deploy.json",
+      "about": "Sync and SFTP one-liners for remote uploads (companion to Objectiv terminal). 3 snippet(s) for SSH, SFTP, and remote dev—use with Objectiv terminal and local OpenSSH (not the VS Code Remote extension host).",
+      "howToAccess": [
+        "Open Objectiv desktop; use the integrated terminal for SSH/SFTP/rsync.",
+        "Extensions → Install snippet or config packs → Enabled.",
+        "Edit ~/.ssh/config or deploy scripts; insert snippets from the picker.",
+        "Pair with your own keys and hosts—Objectiv does not replace VS Code Remote SSH."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-snippets-sftp-deploy.svg"
+      ]
+    },
+    {
+      "id": "vscode-port.docker-remote",
+      "name": "Docker & Remote Dev",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Compose overrides and docker context snippets for remote hosts.",
+      "categories": [
+        "Remote"
+      ],
+      "icon": "icons/docker.svg",
+      "packageUrl": "packages/snippets-docker-remote.json",
+      "about": "Compose overrides and docker context snippets for remote hosts. 3 snippet(s) for SSH, SFTP, and remote dev—use with Objectiv terminal and local OpenSSH (not the VS Code Remote extension host).",
+      "howToAccess": [
+        "Open Objectiv desktop; use the integrated terminal for SSH/SFTP/rsync.",
+        "Extensions → Install snippet or config packs → Enabled.",
+        "Edit ~/.ssh/config or deploy scripts; insert snippets from the picker.",
+        "Pair with your own keys and hosts—Objectiv does not replace VS Code Remote SSH."
+      ],
+      "screenshots": [
+        "screenshots/vscode-port-docker-remote.svg"
+      ]
+    },
+    {
+      "id": "objectiv.config.remote-infra",
+      "name": "Remote / infra editing",
+      "publisher": "Objectiv Marketplace",
+      "version": "1.0.0",
+      "description": "Settings for SSH config, Helm, and Terraform-style files in Objectiv.",
+      "categories": [
+        "Remote"
+      ],
+      "icon": "icons/ssh.svg",
+      "packageUrl": "packages/config-remote-infra.json",
+      "about": "Settings for SSH config, Helm, and Terraform-style files in Objectiv. Merges recommended editor settings into Objectiv while the pack is enabled—no separate config file required.",
+      "howToAccess": [
+        "Open Objectiv desktop; use the integrated terminal for SSH/SFTP/rsync.",
+        "Extensions → Install snippet or config packs → Enabled.",
+        "Edit ~/.ssh/config or deploy scripts; insert snippets from the picker.",
+        "Pair with your own keys and hosts—Objectiv does not replace VS Code Remote SSH."
+      ],
+      "screenshots": [
+        "screenshots/objectiv-config-remote-infra.svg"
+      ]
+    }
+  ]
+}

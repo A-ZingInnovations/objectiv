@@ -1,98 +1,83 @@
+import { useMemo } from 'react';
 import {
   ACTIVITY_BAR_ITEMS,
   isBottomPanelActivity,
+  type ActivityBarItem,
   type ActivityPanel,
 } from '../activityPanels';
-import { AzoMarkSvg } from '../azoMarkSvg';
 import type { BottomPanelTab } from '../bottomPanel';
-
-export type ExtensionActivityItem = {
-  id: ActivityPanel;
-  codicon: string;
-  title: string;
-};
+import { useObjectivSettings } from '../settingsContext';
+import { integrationActivityItems } from '../integrations/integrationActivity';
+import IntegrationBrandIcon from './IntegrationBrandIcon';
 
 type Props = {
   panel: ActivityPanel;
   sideBarVisible: boolean;
-  auxiliaryBarVisible: boolean;
-  extensionPanels?: ExtensionActivityItem[];
   /** Select a side-bar view (or toggle closed if already active). */
   setPanel: (p: ActivityPanel) => void;
-  onToggleMessaging: () => void;
   bottomPanelOpen: boolean;
   bottomPanelTab: BottomPanelTab;
   onBottomPanel: (tab: BottomPanelTab) => void;
 };
 
+function mergeMainActivityItems(integrationItems: ActivityBarItem[]): ActivityBarItem[] {
+  const base = ACTIVITY_BAR_ITEMS.filter((i) => i.section === 'main');
+  const chatIdx = base.findIndex((i) => i.id === 'chat');
+  const insertAt = chatIdx >= 0 ? chatIdx + 1 : base.length;
+  return [...base.slice(0, insertAt), ...integrationItems, ...base.slice(insertAt)];
+}
+
 export default function Sidebar({
   panel,
   sideBarVisible,
-  auxiliaryBarVisible,
-  extensionPanels = [],
   setPanel,
-  onToggleMessaging,
   bottomPanelOpen,
   bottomPanelTab,
   onBottomPanel,
 }: Props) {
+  const { settings } = useObjectivSettings();
+  const main = useMemo(
+    () => mergeMainActivityItems(integrationActivityItems(settings)),
+    [settings.chatPlatform, settings.chatCredential, settings.meetingPlatform, settings.meetingCredential],
+  );
+  const bottom = ACTIVITY_BAR_ITEMS.filter((i) => i.section === 'bottom');
+
   const isActive = (id: ActivityPanel) => {
     if (isBottomPanelActivity(id)) {
       return bottomPanelOpen && bottomPanelTab === (id as BottomPanelTab);
     }
     // Collapsed side bar → no main activity stays highlighted (VS Code).
-    if (id === 'messages') return auxiliaryBarVisible;
     return sideBarVisible && panel === id;
   };
 
-  const renderExtensionItem = (item: ExtensionActivityItem) => (
+  const renderItem = (item: ActivityBarItem) => (
     <button
-      key={item.id}
-      type="button"
-      className={`activity-bar-item ${isActive(item.id) ? 'active' : ''}`}
-      title={item.title}
-      aria-label={item.title}
-      aria-pressed={isActive(item.id)}
-      onClick={() => setPanel(item.id)}
-    >
-      <span className={`codicon codicon-${item.codicon}`} aria-hidden />
-    </button>
-  );
-
-  const renderItem = (item: (typeof ACTIVITY_BAR_ITEMS)[number]) => (
-    <button
-      key={item.id}
+      key={item.id === 'messages' || item.id === 'meetings' ? `${item.id}-${item.brand}` : item.id}
       type="button"
       className={`activity-bar-item ${isActive(item.id) ? 'active' : ''} ${item.placeholder ? 'placeholder' : ''}`}
-      title={item.title}
       aria-label={item.title}
       aria-pressed={isActive(item.id)}
       onClick={() => {
         if (item.id === 'terminal' || item.id === 'problems') {
           onBottomPanel(item.id);
-        } else if (item.id === 'messages') {
-          onToggleMessaging();
         } else {
           setPanel(item.id);
         }
       }}
     >
-      {item.azoMark ? (
-        <span className="activity-bar-azo-mark" aria-hidden>
-          <AzoMarkSvg size={22} />
-        </span>
+      {item.brand ? (
+        <IntegrationBrandIcon brand={item.brand} className="activity-bar-brand" />
       ) : (
         <span className={`codicon codicon-${item.codicon}`} aria-hidden />
       )}
+      <span className="activity-bar-tooltip">{item.title}</span>
     </button>
   );
 
   return (
     <div className="activity-bar">
-      <div className="activity-bar-main">
-        {ACTIVITY_BAR_ITEMS.map(renderItem)}
-        {extensionPanels.map(renderExtensionItem)}
-      </div>
+      <div className="activity-bar-main">{main.map(renderItem)}</div>
+      <div className="activity-bar-bottom">{bottom.map(renderItem)}</div>
     </div>
   );
 }

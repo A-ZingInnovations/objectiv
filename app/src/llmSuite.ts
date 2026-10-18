@@ -1,19 +1,5 @@
 /** LLM Suite — Ollama local models + BYOK OpenAI-compatible HTTP API. */
 
-import type { LlmProviderKind } from './aziaiSettings';
-import { resolveByokAuthStyle, type ProviderAuthStyle } from './llmProviders';
-
-function authHeaders(apiKey: string, org: string | undefined, authStyle: ProviderAuthStyle): Record<string, string> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (authStyle === 'azure-api-key') {
-    if (apiKey) headers['api-key'] = apiKey;
-  } else if (apiKey) {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-  if (org) headers['OpenAI-Organization'] = org;
-  return headers;
-}
-
 export type OllamaModel = {
   name: string;
   size: number;
@@ -140,40 +126,11 @@ export async function ollamaPullModel(
   }
 }
 
-export type ChatTokenUsage = {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-};
-
-export type SuiteChatResult = {
-  content: string;
-  usage: ChatTokenUsage;
-};
-
-function usageFromOpenAi(data: {
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-}): ChatTokenUsage {
-  const prompt = data.usage?.prompt_tokens ?? 0;
-  const completion = data.usage?.completion_tokens ?? 0;
-  const total = data.usage?.total_tokens ?? prompt + completion;
-  return { promptTokens: prompt, completionTokens: completion, totalTokens: total };
-}
-
 export async function ollamaChat(
   baseUrl: string,
   model: string,
   messages: LlmChatMessage[],
 ): Promise<string> {
-  const result = await ollamaChatWithUsage(baseUrl, model, messages);
-  return result.content;
-}
-
-export async function ollamaChatWithUsage(
-  baseUrl: string,
-  model: string,
-  messages: LlmChatMessage[],
-): Promise<SuiteChatResult> {
   const res = await fetch(`${trimBase(baseUrl)}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -183,21 +140,8 @@ export async function ollamaChatWithUsage(
     const text = await res.text().catch(() => '');
     throw new Error(text || `Chat failed: ${res.status}`);
   }
-  const data = (await res.json()) as {
-    message?: { content?: string };
-    prompt_eval_count?: number;
-    eval_count?: number;
-  };
-  const prompt = data.prompt_eval_count ?? 0;
-  const completion = data.eval_count ?? 0;
-  return {
-    content: data.message?.content ?? '',
-    usage: {
-      promptTokens: prompt,
-      completionTokens: completion,
-      totalTokens: prompt + completion,
-    },
-  };
+  const data = (await res.json()) as { message?: { content?: string } };
+  return data.message?.content ?? '';
 }
 
 /** OpenAI-compatible GET /models */
@@ -205,9 +149,10 @@ export async function byokListModels(
   baseUrl: string,
   apiKey: string,
   org?: string,
-  authStyle: ProviderAuthStyle = 'bearer',
 ): Promise<string[]> {
-  const headers = authHeaders(apiKey, org, authStyle);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (org) headers['OpenAI-Organization'] = org;
   const res = await fetch(`${trimBase(baseUrl)}/models`, { headers });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -224,31 +169,13 @@ export async function byokChat(
   model: string,
   messages: LlmChatMessage[],
   org?: string,
-  authStyle: ProviderAuthStyle = 'bearer',
 ): Promise<string> {
-  const result = await byokChatWithUsage(
-    baseUrl,
-    apiKey,
-    model,
-    messages,
-    org,
-    authStyle,
-  );
-  return result.content;
-}
-
-export async function byokChatWithUsage(
-  baseUrl: string,
-  apiKey: string,
-  model: string,
-  messages: LlmChatMessage[],
-  org?: string,
-  authStyle: ProviderAuthStyle = 'bearer',
-): Promise<SuiteChatResult> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...authHeaders(apiKey, org, authStyle),
+    Accept: 'application/json',
   };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  if (org) headers['OpenAI-Organization'] = org;
   const res = await fetch(`${trimBase(baseUrl)}/chat/completions`, {
     method: 'POST',
     headers,
@@ -260,16 +187,12 @@ export async function byokChatWithUsage(
   }
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
-  return {
-    content: data.choices?.[0]?.message?.content ?? '',
-    usage: usageFromOpenAi(data),
-  };
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
 export type SuiteChatOpts = {
-  provider: LlmProviderKind;
+  provider: 'ollama' | 'openai' | 'custom';
   ollamaBaseUrl: string;
   byokBaseUrl: string;
   byokApiKey: string;
@@ -279,42 +202,14 @@ export type SuiteChatOpts = {
 };
 
 export async function suiteChat(opts: SuiteChatOpts): Promise<string> {
-  const result = await suiteChatWithUsage(opts);
-  return result.content;
-}
-
-export async function suiteChatWithUsage(opts: SuiteChatOpts): Promise<SuiteChatResult> {
   if (opts.provider === 'ollama') {
-    return ollamaChatWithUsage(opts.ollamaBaseUrl, opts.model, opts.messages);
+    return ollamaChat(opts.ollamaBaseUrl, opts.model, opts.messages);
   }
-  return byokChatWithUsage(
+  return byokChat(
     opts.byokBaseUrl,
     opts.byokApiKey,
     opts.model,
     opts.messages,
     opts.byokOrg,
-    resolveByokAuthStyle(opts.provider),
   );
-}
-
-export function addTokenUsage(a: ChatTokenUsage, b: ChatTokenUsage): ChatTokenUsage {
-  return {
-    promptTokens: a.promptTokens + b.promptTokens,
-    completionTokens: a.completionTokens + b.completionTokens,
-    totalTokens: a.totalTokens + b.totalTokens,
-  };
-}
-
-export const EMPTY_TOKEN_USAGE: ChatTokenUsage = {
-  promptTokens: 0,
-  completionTokens: 0,
-  totalTokens: 0,
-};
-
-export function formatTokenUsage(usage: ChatTokenUsage): string {
-  if (usage.totalTokens <= 0 && usage.promptTokens <= 0 && usage.completionTokens <= 0) {
-    return '0 tokens';
-  }
-  const fmt = (n: number) => n.toLocaleString();
-  return `${fmt(usage.totalTokens)} tokens · in ${fmt(usage.promptTokens)} · out ${fmt(usage.completionTokens)}`;
 }

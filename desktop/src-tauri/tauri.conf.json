@@ -37,17 +37,12 @@
     "category": "DeveloperTool",
     "macOS": {
       "minimumSystemVersion": "10.13",
-      "infoPlist": "Info.plist"
+      "entitlements": "./Entitlements.plist",
+      "infoPlist": "./Info.plist"
     },
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true }
     }
   },
-  "plugins": {
-    "deep-link": {
-      "desktop": {
-        "schemes": ["objectiv"]
-      }
-    }
-  }
+  "plugins": {}
 }

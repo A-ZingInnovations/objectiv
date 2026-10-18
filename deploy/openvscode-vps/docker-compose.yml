@@ -1,0 +1,40 @@
+# OpenVSCode Server for Objectiv — run on the same VPS as www.a-zing.org
+# From this directory:
+#   cp .env.example .env && edit .env
+#   docker compose up -d
+#
+# Public URL: https://tools.a-zing.org (nginx → 127.0.0.1:3000)
+
+name: objectiv-openvscode
+
+services:
+  openvscode:
+    image: gitpod/openvscode-server:1.105.1
+    container_name: objectiv-openvscode
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Override image entrypoint (it defaults to --without-connection-token).
+    entrypoint: ["/home/.openvscode-server/bin/openvscode-server"]
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "3000"
+      - --connection-token
+      - ${OPENVSCODE_CONNECTION_TOKEN}
+      - --accept-server-license-terms
+      - --server-base-path
+      - /openvscode
+      - --default-folder
+      - /home/workspace
+    volumes:
+      - openvscode_workspace:/home/workspace
+      - openvscode_server_data:/home/.openvscode-server
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 2g
+
+volumes:
+  openvscode_workspace:
+  openvscode_server_data:

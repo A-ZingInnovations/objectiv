@@ -4,12 +4,9 @@ export type WorkspaceMode = 'demo' | 'disk';
 
 export function isTauriDesktop(): boolean {
   if (typeof window === 'undefined') return false;
-  const env = import.meta.env as Record<string, string | boolean | undefined>;
-  if (env.TAURI_ENV_PLATFORM || env.TAURI_PLATFORM) return true;
   if ('isTauri' in window && (window as Window & { isTauri?: boolean }).isTauri) return true;
   if ('__TAURI_INTERNALS__' in window) return true;
   if ('__TAURI__' in window) return true;
-  if ('__TAURI_IPC__' in window) return true;
   return false;
 }
 
@@ -51,63 +48,6 @@ export async function pickWorkspaceFile(): Promise<string | null> {
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : String(e));
   }
-}
-
-export async function pickWorkspaceDefinitionFile(): Promise<string | null> {
-  if (!isTauriDesktop()) {
-    throw new Error('Workspace files require the Objectiv desktop app.');
-  }
-  try {
-    const { open } = await tauriDialog();
-    const selected = await open({
-      directory: false,
-      multiple: false,
-      title: 'Open Workspace from File',
-      filters: [
-        {
-          name: 'Workspace',
-          extensions: ['objectiv-workspace', 'code-workspace', 'json'],
-        },
-      ],
-    });
-    if (selected === null || Array.isArray(selected)) return null;
-    return selected;
-  } catch (e) {
-    throw new Error(e instanceof Error ? e.message : String(e));
-  }
-}
-
-export async function pickSaveWorkspaceDefinitionFile(
-  defaultPath?: string,
-): Promise<string | null> {
-  if (!isTauriDesktop()) {
-    throw new Error('Workspace files require the Objectiv desktop app.');
-  }
-  try {
-    const { save } = await tauriDialog();
-    const selected = await save({
-      title: 'Save Workspace As',
-      defaultPath: defaultPath ?? 'workspace.objectiv-workspace',
-      filters: [
-        { name: 'Objectiv Workspace', extensions: ['objectiv-workspace'] },
-        { name: 'VS Code Workspace', extensions: ['code-workspace'] },
-      ],
-    });
-    if (selected === null) return null;
-    return selected;
-  } catch (e) {
-    throw new Error(e instanceof Error ? e.message : String(e));
-  }
-}
-
-export async function readTextFileAbsolute(path: string): Promise<string> {
-  const { invoke } = await tauriCore();
-  return invoke<string>('read_text_file', { path });
-}
-
-export async function writeTextFileAbsolute(path: string, content: string): Promise<void> {
-  const { invoke } = await tauriCore();
-  await invoke('write_text_file', { path, content });
 }
 
 export async function userHomeDir(): Promise<string | null> {

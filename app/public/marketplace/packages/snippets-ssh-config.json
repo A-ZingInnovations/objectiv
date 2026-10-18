@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "objectiv.snippets.ssh-config",
+    "name": "SSH Config & Remote Shell",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "OpenSSH config blocks and remote session commands (VS Code Remote–style workflows).",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "ssh config host",
+          "language": "plaintext",
+          "body": "Host ${1:alias}\n  HostName ${2:example.com}\n  User ${3:deploy}\n  IdentityFile ~/.ssh/${4:id_ed25519}\n  ForwardAgent yes\n"
+        },
+        {
+          "name": "ssh jump host",
+          "language": "plaintext",
+          "body": "Host ${1:target}\n  HostName ${2:10.0.0.5}\n  User ${3:ubuntu}\n  ProxyJump ${4:bastion}\n"
+        },
+        {
+          "name": "remote tunnel",
+          "language": "shell",
+          "body": "ssh -N -L ${1:5432}:localhost:${2:5432} ${3:user}@${4:host}\n"
+        }
+      ]
+    }
+  }
+}

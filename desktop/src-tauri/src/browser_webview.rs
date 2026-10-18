@@ -25,17 +25,3 @@ pub fn objectiv_browser_reload(app: AppHandle, label: String) -> Result<(), Stri
         .reload()
         .map_err(|e| e.to_string())
 }
-
-#[tauri::command]
-pub fn objectiv_browser_eval(app: AppHandle, label: String, script: String) -> Result<(), String> {
-    browser_webview(&app, &label)?
-        .eval(&script)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn objectiv_browser_stop(app: AppHandle, label: String) -> Result<(), String> {
-    browser_webview(&app, &label)?
-        .eval("window.stop();")
-        .map_err(|e| e.to_string())
-}

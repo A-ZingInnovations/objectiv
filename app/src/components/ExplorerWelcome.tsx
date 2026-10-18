@@ -4,10 +4,57 @@ type Props = {
   onOpenFolder: () => void;
   onCloneRepository?: () => void;
   diskMode: boolean;
+  /** Plain blocks for SideBarSection bodies (Explorer composite). */
+  layout?: 'details' | 'plain';
 };
 
-export default function ExplorerWelcome({ onOpenFolder, onCloneRepository, diskMode }: Props) {
+export default function ExplorerWelcome({
+  onOpenFolder,
+  onCloneRepository,
+  diskMode,
+  layout = 'details',
+}: Props) {
   const desktop = useIsTauriDesktop();
+
+  const noFolder = (
+    <div className="explorer-empty-body">
+      <p className="explorer-empty-text">You have not yet opened a folder.</p>
+      <button
+        type="button"
+        className="explorer-empty-btn"
+        onClick={onOpenFolder}
+        disabled={!desktop && !diskMode}
+      >
+        Open Folder
+      </button>
+      {!desktop && (
+        <p className="explorer-empty-hint">Desktop app required for disk folders.</p>
+      )}
+    </div>
+  );
+
+  const cloneRepo = (
+    <div className="explorer-empty-body">
+      <p className="explorer-empty-text">You can clone a repository locally.</p>
+      <button
+        type="button"
+        className="explorer-empty-btn"
+        onClick={onCloneRepository}
+        disabled={!onCloneRepository || !desktop}
+      >
+        Clone Repository
+      </button>
+    </div>
+  );
+
+  if (layout === 'plain') {
+    return (
+      <>
+        {noFolder}
+        {cloneRepo}
+      </>
+    );
+  }
 
   return (
     <div className="explorer-empty">
@@ -16,20 +63,7 @@ export default function ExplorerWelcome({ onOpenFolder, onCloneRepository, diskM
           <span className="codicon codicon-chevron-down explorer-empty-caret" aria-hidden />
           NO FOLDER OPENED
         </summary>
-        <div className="explorer-empty-body">
-          <p className="explorer-empty-text">You have not yet opened a folder.</p>
-          <button
-            type="button"
-            className="explorer-empty-btn"
-            onClick={onOpenFolder}
-            disabled={!desktop && !diskMode}
-          >
-            Open Folder
-          </button>
-          {!desktop && (
-            <p className="explorer-empty-hint">Desktop app required for disk folders.</p>
-          )}
-        </div>
+        {noFolder}
       </details>
 
       <details className="explorer-empty-section" open>
@@ -37,17 +71,7 @@ export default function ExplorerWelcome({ onOpenFolder, onCloneRepository, diskM
           <span className="codicon codicon-chevron-down explorer-empty-caret" aria-hidden />
           CLONE REPOSITORY
         </summary>
-        <div className="explorer-empty-body">
-          <p className="explorer-empty-text">You can clone a repository locally.</p>
-          <button
-            type="button"
-            className="explorer-empty-btn"
-            onClick={onCloneRepository}
-            disabled={!onCloneRepository || !desktop}
-          >
-            Clone Repository
-          </button>
-        </div>
+        {cloneRepo}
       </details>
 
       <p className="explorer-empty-footer">

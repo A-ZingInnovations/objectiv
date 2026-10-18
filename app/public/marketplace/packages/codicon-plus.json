@@ -1,0 +1,11 @@
+{
+  "manifest": {
+    "id": "azing.icons.codicon-plus",
+    "name": "Codicon Plus Pack",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Icon metadata pack for Objectiv.",
+    "kind": "icons",
+    "contributes": {}
+  }
+}

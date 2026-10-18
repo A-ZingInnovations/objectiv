@@ -16,9 +16,11 @@ import {
   saveSettings,
   type ObjectivSettings,
 } from './aziaiSettings';
-import { applyWorkbenchAppearance, themeBaseKind } from './objectivThemes';
-import { isTauriDesktop } from './desktopWorkspace';
-import { rebuildMarketplaceRuntime, syncIntegrationsToSidecar } from './marketplaceRuntime';
+import { themeBaseKind } from './objectivThemes';
+import {
+  applyFullWorkbenchLook,
+  subscribeMarketplaceRuntime,
+} from './marketplace/runtime';
 
 type SettingsContextValue = {
   settings: ObjectivSettings;
@@ -50,35 +52,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<ObjectivSettings>(() => loadSettings());
 
   useEffect(() => {
-    applyWorkbenchAppearance({
+    applyFullWorkbenchLook({
       workbenchColorTheme: settings.workbenchColorTheme,
       accentColor: settings.accentColor,
     });
   }, [settings.workbenchColorTheme, settings.accentColor]);
 
   useEffect(() => {
-    applyZoomLevel(settings.zoomLevel);
-  }, [settings.zoomLevel]);
+    return subscribeMarketplaceRuntime(() => {
+      applyFullWorkbenchLook({
+        workbenchColorTheme: settings.workbenchColorTheme,
+        accentColor: settings.accentColor,
+      });
+    });
+  }, [settings.workbenchColorTheme, settings.accentColor]);
 
   useEffect(() => {
-    if (!isTauriDesktop()) return;
-    void rebuildMarketplaceRuntime();
+    if (typeof window === 'undefined') return;
+    let unsub: (() => void) | undefined;
+    void import('monaco-editor').then((monaco) => {
+      import('./marketplace/registerSnippetProviders').then(({ registerMarketplaceSnippetProviders }) => {
+        unsub = registerMarketplaceSnippetProviders(monaco as unknown as import('@monaco-editor/react').Monaco);
+      });
+    });
+    return () => {
+      unsub?.();
+    };
   }, []);
 
   useEffect(() => {
-    if (!isTauriDesktop()) return;
-    const url = settings.sidecarUrl.replace(/\/$/, '');
-    if (!url) return;
-    void syncIntegrationsToSidecar(url, settings, settings.pilotUser);
-  }, [
-    settings.sidecarUrl,
-    settings.chatPlatform,
-    settings.chatCredential,
-    settings.mailImapHost,
-    settings.mailImapUser,
-    settings.mailImapPassword,
-    settings.pilotUser,
-  ]);
+    applyZoomLevel(settings.zoomLevel);
+  }, [settings.zoomLevel]);
 
   const persist = useCallback((next: ObjectivSettings) => {
     setSettings(next);

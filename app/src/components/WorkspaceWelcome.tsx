@@ -1,4 +1,3 @@
-import { AzoMarkSvg } from '../azoMarkSvg';
 import { COMPANY_WORDMARK, PRODUCT_TAGLINE } from '../branding';
 import { workspaceFolderLabel } from '../desktopWorkspace';
 import { useObjectivSettings } from '../settingsContext';
@@ -66,9 +65,15 @@ export default function WorkspaceWelcome({
   return (
     <div className="workspace-welcome" aria-label="Workspace">
       <div className="workspace-welcome-bg" aria-hidden />
-      <div className="workspace-welcome-watermark" aria-hidden>
-        <AzoMarkSvg size={560} />
-      </div>
+      <img
+        className="workspace-welcome-watermark"
+        src="/objectiv-azo-logo.jpg"
+        alt=""
+        width={560}
+        height={560}
+        decoding="async"
+        aria-hidden
+      />
 
       <footer className={lockupClass}>
         <img

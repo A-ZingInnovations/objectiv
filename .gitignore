@@ -2,6 +2,7 @@
 node_modules/
 app/dist/
 app/.env.local
+app/.env.production.local
 app/tsconfig.tsbuildinfo
 desktop/node_modules/
 desktop/src-tauri/target/

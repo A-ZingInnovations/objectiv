@@ -1,3 +1,5 @@
+import type { IntegrationBrand } from './integrations/integrationActivity';
+
 /** Activity bar panels — matches VS Code workbench order + Objective/terminal. */
 export type ActivityPanel =
   | 'explorer'
@@ -8,21 +10,20 @@ export type ActivityPanel =
   | 'extensions'
   | 'chat'
   | 'browser'
-  | 'remote-sftp'
-  | 'devcentra'
+  | 'llm'
   | 'terminal'
   | 'settings'
-  | 'messages';
+  | 'messages'
+  | 'meetings';
 
 export type ActivityBarItem = {
   id: ActivityPanel;
-  codicon: string;
+  codicon?: string;
+  brand?: IntegrationBrand;
   title: string;
-  /** Render AZO ring instead of codicon (Chat / agent). */
-  azoMark?: boolean;
   /** Full panel not implemented yet (shows placeholder view). */
   placeholder?: boolean;
-  section: 'main';
+  section: 'main' | 'bottom';
 };
 
 export const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
@@ -41,19 +42,17 @@ export const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
     title: 'Extensions (⌘⇧X)',
     section: 'main',
   },
-  { id: 'chat', codicon: 'comment-discussion', azoMark: true, title: 'Chat (⌘⇧A)', section: 'main' },
+  { id: 'chat', codicon: 'comment-discussion', title: 'Objective Agent (⌘⇧A)', section: 'main' },
   { id: 'browser', codicon: 'globe', title: 'Browser (⌘⇧B)', section: 'main' },
-  { id: 'messages', codicon: 'inbox', title: 'Messaging (⌘⇧I)', section: 'main' },
+  { id: 'llm', codicon: 'hubot', title: 'LLM Suite (⌘⇧L)', section: 'main' },
+  { id: 'problems', codicon: 'warning', title: 'Problems (⌘⇧M)', section: 'bottom' },
+  { id: 'terminal', codicon: 'terminal', title: 'Terminal (⌃`)', section: 'bottom' },
+  { id: 'settings', codicon: 'settings-gear', title: 'Settings (⌘,)', section: 'bottom' },
 ];
 
 /** Sidebar hosts explorer/search/etc.; terminal, problems, and settings use other chrome. */
 export function panelShowsSidebar(panel: ActivityPanel): boolean {
-  return (
-    panel !== 'terminal' &&
-    panel !== 'problems' &&
-    panel !== 'settings' &&
-    panel !== 'messages'
-  );
+  return panel !== 'terminal' && panel !== 'problems' && panel !== 'settings';
 }
 
 export function isBottomPanelActivity(panel: ActivityPanel): boolean {
@@ -78,16 +77,16 @@ export function panelTitle(panel: ActivityPanel): string {
       return 'AGENT';
     case 'browser':
       return 'BROWSER';
-    case 'remote-sftp':
-      return 'SFTP';
-    case 'devcentra':
-      return 'DEVCENTRA';
+    case 'llm':
+      return 'LLM SUITE';
+    case 'messages':
+      return 'CHAT';
+    case 'meetings':
+      return 'MEETINGS';
     case 'terminal':
       return 'TERMINAL';
     case 'settings':
       return 'SETTINGS';
-    case 'messages':
-      return 'MESSAGING';
     default:
       return '';
   }

@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "id": "azing.agent.objective-git",
+    "name": "Objective Git Tools",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Git status, diff, and commit helpers for the Objective sidecar.",
+    "kind": "agent-tool",
+    "contributes": {}
+  },
+  "files": {
+    "tools.json": "{\n  \"tools\": [\"git_status\", \"git_diff\", \"git_commit\", \"workspace_scan\"]\n}\n"
+  }
+}

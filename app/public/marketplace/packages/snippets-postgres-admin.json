@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "objectiv.snippets.postgres-admin",
+    "name": "PostgreSQL Admin",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "psql-friendly snippets for roles, indexes, and explain plans.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "explain analyze",
+          "language": "sql",
+          "body": "EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)\n${1:SELECT ...};\n"
+        },
+        {
+          "name": "create index concurrently",
+          "language": "sql",
+          "body": "CREATE INDEX CONCURRENTLY IF NOT EXISTS ${1:idx_name}\n  ON ${2:table} (${3:column});\n"
+        },
+        {
+          "name": "grant select",
+          "language": "sql",
+          "body": "GRANT SELECT ON ${1:table} TO ${2:role};\n"
+        }
+      ]
+    }
+  }
+}

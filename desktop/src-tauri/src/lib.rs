@@ -1,81 +1,21 @@
-mod azing_session;
 mod browser_webview;
 mod debug;
-mod extension_pack;
 mod marketplace;
 mod lsp;
 mod notebook_kernel;
-mod oauth_loopback;
 mod openvscode;
 mod pty;
 mod shell;
-mod sftp;
+mod slack;
+mod slack_socket;
 mod workspace;
 mod workspace_watch;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{Emitter, Manager, RunEvent};
-use tauri_plugin_deep_link::DeepLinkExt;
-
-static PENDING_OBJECTIV_OAUTH: Mutex<Option<String>> = Mutex::new(None);
-
-fn stash_objectiv_oauth_url(url: &str) {
-    let ok = url.contains("access_token=")
-        && (url.starts_with("objectiv://")
-            || url.starts_with("http://127.0.0.1")
-            || url.starts_with("http://localhost"));
-    if !ok {
-        return;
-    }
-    if let Ok(mut pending) = PENDING_OBJECTIV_OAUTH.lock() {
-        *pending = Some(url.to_string());
-    }
-}
-
-fn emit_oauth_to_webview(app: &tauri::AppHandle, url: &str) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.emit("objectiv-deep-link", url);
-    } else {
-        let _ = app.emit("objectiv-deep-link", url);
-    }
-}
-
-pub(crate) fn deliver_objectiv_oauth_callback(app: &tauri::AppHandle, url: &str) {
-    stash_objectiv_oauth_url(url);
-    emit_oauth_to_webview(app, url);
-    focus_main_window(app);
-}
-
-#[tauri::command]
-fn take_pending_objectiv_oauth() -> Option<String> {
-    PENDING_OBJECTIV_OAUTH
-        .lock()
-        .ok()
-        .and_then(|mut pending| pending.take())
-}
-
-fn emit_deep_link(app: &tauri::AppHandle, url: &str) {
-    if !url.starts_with("objectiv://") {
-        return;
-    }
-    deliver_objectiv_oauth_callback(app, url);
-}
-
-fn emit_deep_link_urls(app: &tauri::AppHandle, urls: &[tauri::Url]) {
-    for url in urls {
-        emit_deep_link(app, url.as_str());
-    }
-}
-
-fn handle_launch_urls(app: &tauri::AppHandle) {
-    for arg in std::env::args().skip(1) {
-        if arg.starts_with("objectiv://") {
-            emit_deep_link(app, &arg);
-        }
-    }
-}
 
 fn focus_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -101,22 +41,6 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
         Some("CmdOrCtrl+Shift+O"),
     )?;
     let add_folder = MenuItem::with_id(app, "file_add_folder", "Add Folder to Workspace…", true, None::<&str>)?;
-    let open_workspace = MenuItem::with_id(
-        app,
-        "file_open_workspace",
-        "Open Workspace from File…",
-        true,
-        None::<&str>,
-    )?;
-    let save_workspace =
-        MenuItem::with_id(app, "file_save_workspace", "Save Workspace", true, None::<&str>)?;
-    let save_workspace_as = MenuItem::with_id(
-        app,
-        "file_save_workspace_as",
-        "Save Workspace As…",
-        true,
-        None::<&str>,
-    )?;
     let close_folder = MenuItem::with_id(app, "file_close_folder", "Close Folder", true, None::<&str>)?;
     let sep_save = PredefinedMenuItem::separator(app)?;
     let save = MenuItem::with_id(app, "file_save", "Save", true, Some("CmdOrCtrl+S"))?;
@@ -134,9 +58,6 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
             &open_file,
             &open_folder,
             &add_folder,
-            &open_workspace,
-            &save_workspace,
-            &save_workspace_as,
             &close_folder,
             &sep_save,
             &save,
@@ -256,46 +177,21 @@ pub fn run() {
         .manage(Arc::new(openvscode::OpenVsCodePool::new()))
         .manage(Arc::new(notebook_kernel::NotebookKernelPool::new()))
         .manage(Arc::new(workspace_watch::WorkspaceWatchPool::new()))
-        .manage(Arc::new(sftp::SftpPool::new()));
+        .manage(Arc::new(slack_socket::SlackSocketService::new()));
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            for arg in argv {
-                if arg.starts_with("objectiv://") {
-                    emit_deep_link(app, arg.as_str());
-                }
-            }
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_main_window(app);
         }));
     }
 
     builder
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let menu = build_app_menu(app)?;
             app.set_menu(menu)?;
-            handle_launch_urls(app.handle());
-
-            let handle = app.handle().clone();
-            app.deep_link().on_open_url(move |event| {
-                emit_deep_link_urls(&handle, event.urls().as_slice());
-            });
-            // Defer so the webview has mounted its objectiv-deep-link listener (cold start from objectiv://).
-            let boot = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(1200));
-                if let Ok(Some(urls)) = boot.deep_link().get_current() {
-                    emit_deep_link_urls(&boot, urls.as_slice());
-                }
-            });
-
-            #[cfg(any(windows, target_os = "linux"))]
-            {
-                let _ = app.deep_link().register_all();
-            }
-
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -306,9 +202,13 @@ pub fn run() {
                 let _ = app.emit("objectiv-menu", id);
             }
         })
+        .on_permission_request(|_, kind| match kind {
+            PermissionKind::Camera | PermissionKind::Microphone | PermissionKind::DisplayCapture => {
+                PermissionResponse::Allow
+            }
+            _ => PermissionResponse::Default,
+        })
         .invoke_handler(tauri::generate_handler![
-            take_pending_objectiv_oauth,
-            oauth_loopback::start_objectiv_oauth_loopback,
             shell::open_external,
             pty::pty_spawn,
             pty::pty_write,
@@ -343,9 +243,6 @@ pub fn run() {
             workspace::workspace_run_shell,
             workspace::user_home,
             workspace::path_is_dir,
-            workspace::read_text_file,
-            workspace::write_text_file,
-            workspace::write_file_bytes,
             lsp::lsp_start,
             lsp::lsp_send,
             lsp::lsp_stop,
@@ -362,34 +259,26 @@ pub fn run() {
             notebook_kernel::notebook_kernel_shutdown,
             browser_webview::objectiv_browser_navigate,
             browser_webview::objectiv_browser_reload,
-            browser_webview::objectiv_browser_eval,
-            browser_webview::objectiv_browser_stop,
-            marketplace::marketplace_install_package,
-            marketplace::marketplace_install_extension_folder,
-            marketplace::marketplace_install_extension_archive,
-            marketplace::marketplace_read_extension_readme,
-            marketplace::marketplace_reveal_extension_folder,
+            marketplace::marketplace_apps_dir,
             marketplace::marketplace_list_installed,
-            marketplace::marketplace_list_installed_details,
-            marketplace::marketplace_read_enabled_packages,
-            marketplace::marketplace_write_runtime,
-            marketplace::marketplace_read_cloud_env,
-            marketplace::marketplace_set_extension_enabled,
-            marketplace::marketplace_uninstall_extension,
-            azing_session::azing_session_read,
-            azing_session::azing_session_write,
-            azing_session::azing_session_clear,
-            azing_session::azing_device_read,
-            azing_session::azing_device_write,
-            azing_session::azing_http_request,
-            azing_session::azing_http_multipart,
-            azing_session::azing_http_get_bytes,
-            sftp::sftp_connect,
-            sftp::sftp_disconnect,
-            sftp::sftp_list,
-            sftp::sftp_upload,
-            sftp::sftp_download,
-            sftp::sftp_local_list_dir,
+            marketplace::marketplace_install,
+            marketplace::marketplace_uninstall,
+            marketplace::marketplace_set_enabled,
+            slack::slack_fetch_workspace,
+            slack::slack_conversation_history,
+            slack::slack_fetch_protected_media,
+            slack::slack_post_message,
+            slack::slack_send_composer,
+            slack::slack_update_message,
+            slack::slack_auth_self,
+            slack::slack_add_reaction,
+            slack::slack_remove_reaction,
+            slack::slack_list_users,
+            slack::slack_cache_read,
+            slack::slack_cache_write,
+            slack_socket::slack_socket_start,
+            slack_socket::slack_socket_stop,
+            slack_socket::slack_socket_is_running,
         ])
         .build(tauri::generate_context!())
         .expect("error while running Objectiv")

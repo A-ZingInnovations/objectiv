@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "id": "vscode-port.dracula-theme",
+    "name": "Dracula (VS Code port)",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Port of the popular Dracula color palette for Objectiv workbench chrome.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#bd93f9",
+      "cssVars": {
+        "--editor-bg": "#282a36",
+        "--editor-fg": "#f8f8f2",
+        "--side-bar-bg": "#21222c",
+        "--activity-bar-bg": "#191a21",
+        "--tab-active-bg": "#282a36",
+        "--tab-inactive-bg": "#21222c",
+        "--status-bar-bg": "#191a21",
+        "--objectiv-accent": "#bd93f9"
+      }
+    }
+  }
+}

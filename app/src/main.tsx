@@ -9,7 +9,6 @@ import TerminalPopoutApp from './components/TerminalPopoutApp';
 import { loadSettings } from './aziaiSettings';
 import { applyWorkbenchAppearance } from './objectivThemes';
 import { SettingsProvider } from './settingsContext';
-import { AzingAccountProvider } from './azingAccountContext';
 import { isTerminalSurface } from './terminalPopout';
 import '@vscode/codicons/dist/codicon.css';
 import './index.css';
@@ -39,8 +38,6 @@ const surface = isTerminalSurface() ? (
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <SettingsProvider>
-      <AzingAccountProvider>{surface}</AzingAccountProvider>
-    </SettingsProvider>
+    <SettingsProvider>{surface}</SettingsProvider>
   </React.StrictMode>,
 );

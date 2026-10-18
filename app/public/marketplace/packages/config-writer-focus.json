@@ -1,0 +1,20 @@
+{
+  "manifest": {
+    "id": "objectiv.config.writer-focus",
+    "name": "Writer focus",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Soft wrap and clean whitespace for notes and markdown.",
+    "kind": "config",
+    "contributes": {
+      "editor": {
+        "tabSize": 2,
+        "insertSpaces": true,
+        "formatOnSave": false,
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true,
+        "wordWrap": "on"
+      }
+    }
+  }
+}

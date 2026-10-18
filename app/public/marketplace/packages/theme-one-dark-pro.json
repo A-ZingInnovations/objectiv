@@ -1,0 +1,22 @@
+{
+  "manifest": {
+    "id": "vscode-port.one-dark-pro",
+    "name": "One Dark Pro (VS Code port)",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Atom One Dark Pro–style workbench overlay.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#61afef",
+      "cssVars": {
+        "--editor-bg": "#282c34",
+        "--editor-fg": "#abb2bf",
+        "--side-bar-bg": "#21252b",
+        "--activity-bar-bg": "#21252b",
+        "--tab-active-bg": "#282c34",
+        "--tab-inactive-bg": "#2c313a",
+        "--status-bar-bg": "#21252b"
+      }
+    }
+  }
+}

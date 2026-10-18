@@ -1,0 +1,20 @@
+{
+  "manifest": {
+    "id": "objectiv.config.database-editor",
+    "name": "Database file editor defaults",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Tab and whitespace defaults tuned for SQL, JSON, and YAML connection files.",
+    "kind": "config",
+    "contributes": {
+      "editor": {
+        "tabSize": 2,
+        "insertSpaces": true,
+        "formatOnSave": false,
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true,
+        "wordWrap": "off"
+      }
+    }
+  }
+}

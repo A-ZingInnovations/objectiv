@@ -21,8 +21,9 @@ type Handlers = {
   saveAllFiles?: () => void;
   /** When a browser editor tab is active. */
   toggleBrowserDevtools?: () => void;
+  openBrowserSeleniumFixture?: () => void;
+  openBrowserHtmlPlayground?: () => void;
   reloadBrowserTab?: () => void;
-  openLlmSuiteSettings?: () => void;
 };
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -155,6 +156,18 @@ export function useWorkbenchKeyboard(handlers: Handlers, enabled = true): void {
         return;
       }
 
+      if (mod && shift && key === 't' && handlers.openBrowserSeleniumFixture) {
+        e.preventDefault();
+        handlers.openBrowserSeleniumFixture();
+        return;
+      }
+
+      if (mod && shift && key === 'h' && handlers.openBrowserHtmlPlayground) {
+        e.preventDefault();
+        handlers.openBrowserHtmlPlayground();
+        return;
+      }
+
       if (mod && key === 'r' && handlers.reloadBrowserTab) {
         e.preventDefault();
         handlers.reloadBrowserTab();
@@ -171,16 +184,12 @@ export function useWorkbenchKeyboard(handlers: Handlers, enabled = true): void {
           a: 'chat',
           b: 'browser',
           i: 'messages',
+          l: 'llm',
         };
         const panel = panelMap[key];
         if (panel) {
           e.preventDefault();
           handlers.showPanel(panel);
-          return;
-        }
-        if (key === 'l' && handlers.openLlmSuiteSettings) {
-          e.preventDefault();
-          handlers.openLlmSuiteSettings();
           return;
         }
       }

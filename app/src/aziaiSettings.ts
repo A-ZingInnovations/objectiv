@@ -1,14 +1,13 @@
 /** Local workbench settings (localStorage). Env vars seed defaults only. */
 
-import { normalizeAzingApiRoot } from './azingAccount';
-import type { BrowserSearchEngine } from './browser';
-
 import {
   applyWorkbenchAppearance,
   resolveWorkbenchColorTheme,
   themeBaseKind,
   type WorkbenchColorThemeId,
 } from './objectivThemes';
+import { isTauriDesktop } from './desktopWorkspace';
+import { isEnterpriseLicensed } from './objectivLicense';
 
 export type ObjectivTheme = 'dark' | 'light';
 export type { WorkbenchColorThemeId };
@@ -25,21 +24,12 @@ export type ChatPlatform = 'teams' | 'slack' | 'mattermost' | 'google_chat' | 'n
 /** Meeting / video platforms Objectiv allows the user to connect. */
 export type MeetingPlatform = 'zoom' | 'teams' | 'slack' | 'google_meet' | 'none';
 
-/** Active inference backend for LLM Suite playground / Objective Codex sync. */
-export type LlmProviderKind =
-  | 'ollama'
-  | 'openai'
-  | 'anthropic'
-  | 'azure'
-  | 'bedrock'
-  | 'grok'
-  | 'custom';
+/** Active inference backend for LLM Suite playground / API. */
+export type LlmProviderKind = 'ollama' | 'openai' | 'custom';
 
 export type ObjectivSettings = {
   sidecarUrl: string;
   pilotUser: string;
-  /** When true, push LLM Suite model + BYOK to the Objective Codex sidecar on change. */
-  codexSyncWithLlmSuite: boolean;
   /** @deprecated Synced from workbenchColorTheme — Monaco light/dark. */
   theme: ObjectivTheme;
   /** Workbench shell palette preset. */
@@ -50,16 +40,39 @@ export type ObjectivSettings = {
   displayName: string;
   /** Optional path to Objective vscode-extension for “Open folder”. */
   objectiveExtensionPath: string;
-  /** Local port for OpenVSCode Server (extensions / marketplace). */
+  /** `hosted` = A-Zing VPS; `local` = spawn on this machine (legacy). */
+  openVsCodeMode: 'hosted' | 'local';
+  /** HTTPS base URL for hosted OpenVSCode (Objectiv embeds this in the editor). */
+  openVsCodeHostedUrl: string;
+  /** Connection token (appended as `?tk=`); stored locally only. */
+  openVsCodeConnectionToken: string;
+  /** Local port when openVsCodeMode is `local`. */
   openVsCodePort: number;
-  /** A-Zing product API root (account, sync, DevCentra). */
-  azingApiRoot: string;
+  /** Override catalog URL (empty = bundled dev catalog or A-Zing static host). */
+  marketplaceCatalogUrl: string;
+
+  /** Enterprise JWT / license key (local only; entitlement checked in objectivLicense). */
+  enterpriseLicenseKey: string;
+  /** Org id for online activation (e.g. azing). */
+  enterpriseLicenseOrgId: string;
+  /** Seat email for online activation. */
+  enterpriseActivationEmail: string;
+  /** One-time org activation code from admin (not stored after activate). */
+  enterpriseActivationCode: string;
+  /** Org label for integrations (e.g. A-Zing, Lucid Compliances). */
+  orgWorkspaceTag: string;
 
   // —— Integrations (user configures which allowed platforms to use) ——
   /** Active chat platform for on-behalf messaging (none = not configured). */
   chatPlatform: ChatPlatform;
+  /** Workspace label (e.g. Lucid Compliances) shown in Messaging when using Slack. */
+  chatWorkspaceTag: string;
+  /** Default Slack channel id (C…) for LFRAS / project posts — local only. */
+  slackDefaultChannelId: string;
   /** Connection string / webhook / bot token for the active chat platform (local only). */
   chatCredential: string;
+  /** Slack app-level token (xapp-…) for Socket Mode — local only. */
+  slackAppToken: string;
   /** Active meetings platform (none = not configured). */
   meetingPlatform: MeetingPlatform;
   /** Connection string / OAuth / API key for meetings (local only). */
@@ -169,10 +182,6 @@ export type ObjectivSettings = {
   llmByokApiKey: string;
   /** Optional org / project header for OpenAI. */
   llmByokOrg: string;
-
-  /** Browser new-tab / home URL (`about:blank` for start page). */
-  browserHomePage: string;
-  browserSearchEngine: BrowserSearchEngine;
 };
 
 const STORAGE_KEY = 'objectiv-settings-v1';
@@ -190,23 +199,172 @@ function envExtensionPath(): string {
   return import.meta.env.VITE_OBJECTIVE_EXTENSION_PATH || '';
 }
 
+function envOpenVsCodeHostedUrl(): string {
+  return (
+    import.meta.env.VITE_OBJECTIV_OPENVSCODE_HOSTED_URL ||
+    'https://www.a-zing.org/openvscode'
+  ).replace(/\/$/, '');
+}
+
+function envOpenVsCodeToken(): string {
+  return import.meta.env.VITE_OBJECTIV_OPENVSCODE_TOKEN || '';
+}
+
+function envMarketplaceCatalogUrl(): string {
+  return (
+    import.meta.env.VITE_OBJECTIV_MARKETPLACE_CATALOG_URL ||
+    'https://marketplace.project-objectiv.com/catalog.json'
+  ).replace(/\/$/, '');
+}
+
+function envChatPlatform(): ChatPlatform {
+  const raw = (import.meta.env.VITE_OBJECTIV_CHAT_PLATFORM || '').trim().toLowerCase();
+  if (raw === 'slack') return 'slack';
+  if (raw === 'teams') return 'teams';
+  if (raw === 'mattermost') return 'mattermost';
+  if (raw === 'google_chat') return 'google_chat';
+  return 'none';
+}
+
+function envChatWorkspaceTag(): string {
+  return (
+    import.meta.env.VITE_OBJECTIV_SLACK_WORKSPACE_TAG ||
+    import.meta.env.VITE_OBJECTIV_CHAT_WORKSPACE_TAG ||
+    ''
+  ).trim();
+}
+
+function envSlackDefaultChannelId(): string {
+  return (
+    import.meta.env.VITE_OBJECTIV_SLACK_CHANNEL_ID ||
+    import.meta.env.VITE_OBJECTIV_SLACK_DEFAULT_CHANNEL_ID ||
+    ''
+  ).trim();
+}
+
+function envSlackBotToken(): string {
+  return (import.meta.env.VITE_OBJECTIV_SLACK_BOT_TOKEN || '').trim();
+}
+
+function envOrgWorkspaceTag(): string {
+  return (import.meta.env.VITE_OBJECTIV_ORG_TAG || '').trim();
+}
+
+function envMailImapHost(): string {
+  return (import.meta.env.VITE_OBJECTIV_MAIL_IMAP_HOST || 'mail.a-zing.org').trim();
+}
+
+function envMailImapUser(): string {
+  return (import.meta.env.VITE_OBJECTIV_MAIL_IMAP_USER || '').trim();
+}
+
+function envMailImapPassword(): string {
+  return (import.meta.env.VITE_OBJECTIV_MAIL_IMAP_PASSWORD || '').trim();
+}
+
+function envLicenseKey(): string {
+  return (import.meta.env.VITE_OBJECTIV_LICENSE_KEY || '').trim();
+}
+
+/** Apply .env integration seeds without overwriting explicit user settings. */
+function applyEnvChatDefaults(settings: ObjectivSettings, parsed: Partial<ObjectivSettings>): ObjectivSettings {
+  const envPlatform = envChatPlatform();
+  const envTag = envChatWorkspaceTag();
+  const envChannel = envSlackDefaultChannelId();
+  const envToken = envSlackBotToken();
+
+  let next = settings;
+  const lucidEnv =
+    envPlatform === 'slack' && envTag.toLowerCase().includes('lucid');
+  if (
+    envPlatform !== 'none' &&
+    (parsed.chatPlatform === undefined ||
+      (lucidEnv && (parsed.chatPlatform === 'none' || parsed.chatPlatform === undefined)))
+  ) {
+    next = { ...next, chatPlatform: envPlatform };
+  }
+  if (envTag && !asStr(parsed.chatWorkspaceTag, '').trim()) {
+    next = { ...next, chatWorkspaceTag: envTag };
+  }
+  if (envChannel && !asStr(parsed.slackDefaultChannelId, '').trim()) {
+    next = { ...next, slackDefaultChannelId: envChannel };
+  }
+  if (envToken && !asStr(parsed.chatCredential, '').trim()) {
+    next = { ...next, chatCredential: envToken };
+  }
+  if (
+    envPlatform === 'slack' &&
+    envTag.toLowerCase().includes('lucid') &&
+    !asStr(parsed.chatWorkspaceTag, '').trim()
+  ) {
+    next = { ...next, chatWorkspaceTag: envTag || 'Lucid Compliances' };
+  }
+  return next;
+}
+
+function applyEnvOrgAndMailDefaults(
+  settings: ObjectivSettings,
+  parsed: Partial<ObjectivSettings>,
+): ObjectivSettings {
+  let next = settings;
+  const orgTag = envOrgWorkspaceTag();
+  if (orgTag && !asStr(parsed.orgWorkspaceTag, '').trim()) {
+    next = { ...next, orgWorkspaceTag: orgTag };
+  }
+  const envKey = envLicenseKey();
+  if (envKey && !asStr(parsed.enterpriseLicenseKey, '').trim()) {
+    next = { ...next, enterpriseLicenseKey: envKey };
+  }
+  if (!isEnterpriseLicensed(next)) return next;
+
+  const mailUser = envMailImapUser();
+  const mailHost = envMailImapHost();
+  const mailPass = envMailImapPassword();
+  if (mailHost && !asStr(parsed.mailImapHost, '').trim()) {
+    next = { ...next, mailImapHost: mailHost };
+  }
+  if (mailUser && !asStr(parsed.mailImapUser, '').trim()) {
+    next = { ...next, mailImapUser: mailUser };
+  }
+  if (mailPass && !asStr(parsed.mailImapPassword, '').trim()) {
+    next = { ...next, mailImapPassword: mailPass };
+  }
+  if (
+    orgTag.toLowerCase() === 'objectiv' &&
+    mailUser.toLowerCase() === 'prasanna@a-zing.org' &&
+    !asStr(parsed.chatWorkspaceTag, '').trim()
+  ) {
+    next = { ...next, chatWorkspaceTag: 'Objectiv · A-Zing' };
+  }
+  return next;
+}
+
 export function defaultSettings(): ObjectivSettings {
   return {
     sidecarUrl: envSidecar(),
     pilotUser: envPilot(),
-    codexSyncWithLlmSuite: true,
     theme: 'dark',
     workbenchColorTheme: 'dark-plus',
     accentColor: '',
     displayName: '',
     objectiveExtensionPath: envExtensionPath(),
+    openVsCodeMode: 'hosted',
+    openVsCodeHostedUrl: envOpenVsCodeHostedUrl(),
+    openVsCodeConnectionToken: envOpenVsCodeToken(),
     openVsCodePort: 9888,
-    azingApiRoot:
-      (import.meta.env.VITE_AZING_API_ROOT as string | undefined)?.replace(/\/$/, '') ||
-      'https://www.a-zing.org/api/v1',
+    marketplaceCatalogUrl: envMarketplaceCatalogUrl(),
 
-    chatPlatform: 'none',
-    chatCredential: '',
+    enterpriseLicenseKey: '',
+    enterpriseLicenseOrgId: envOrgWorkspaceTag().toLowerCase() === 'objectiv' ? 'azing' : '',
+    enterpriseActivationEmail: envMailImapUser(),
+    enterpriseActivationCode: '',
+    orgWorkspaceTag: envOrgWorkspaceTag(),
+
+    chatPlatform: envChatPlatform(),
+    chatWorkspaceTag: envChatWorkspaceTag(),
+    slackDefaultChannelId: envSlackDefaultChannelId(),
+    slackAppToken: '',
+    chatCredential: envSlackBotToken(),
     meetingPlatform: 'none',
     meetingCredential: '',
     mailImapHost: '',
@@ -260,13 +418,7 @@ export function defaultSettings(): ObjectivSettings {
     sideBarVisible: true,
     panelVisible: false,
     statusBarVisible: true,
-    menuBarVisible:
-      typeof window !== 'undefined' &&
-      (('isTauri' in window && (window as Window & { isTauri?: boolean }).isTauri) ||
-        '__TAURI__' in window ||
-        '__TAURI_INTERNALS__' in window)
-        ? false
-        : true,
+    menuBarVisible: !isTauriDesktop(),
     centeredLayout: false,
     welcomeBrandTransparent: true,
     bottomPanelHeightPx: 280,
@@ -287,9 +439,6 @@ export function defaultSettings(): ObjectivSettings {
     llmByokBaseUrl: 'https://api.openai.com/v1',
     llmByokApiKey: '',
     llmByokOrg: '',
-
-    browserHomePage: 'about:blank',
-    browserSearchEngine: 'google',
   };
 }
 
@@ -317,7 +466,9 @@ export function loadSettings(): ObjectivSettings {
     const raw =
       localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return defaultSettings();
-    return mergeSettings(JSON.parse(raw) as Partial<ObjectivSettings>);
+    const parsed = JSON.parse(raw) as Partial<ObjectivSettings>;
+    const merged = mergeSettings(parsed);
+    return applyEnvOrgAndMailDefaults(applyEnvChatDefaults(merged, parsed), parsed);
   } catch {
     return defaultSettings();
   }
@@ -330,7 +481,6 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
     ...parsed,
     sidecarUrl: asStr(parsed.sidecarUrl, envSidecar()).replace(/\/$/, '') || envSidecar(),
     pilotUser: asStr(parsed.pilotUser, base.pilotUser),
-    codexSyncWithLlmSuite: asBool(parsed.codexSyncWithLlmSuite, base.codexSyncWithLlmSuite),
     workbenchColorTheme: resolveWorkbenchColorTheme(parsed.workbenchColorTheme, parsed.theme),
     accentColor: asStr(parsed.accentColor, base.accentColor),
     theme: themeBaseKind(
@@ -338,28 +488,24 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
     ),
     displayName: asStr(parsed.displayName, base.displayName),
     objectiveExtensionPath: asStr(parsed.objectiveExtensionPath, base.objectiveExtensionPath),
+    openVsCodeMode:
+      parsed.openVsCodeMode === 'local' ? 'local' : 'hosted',
+    openVsCodeHostedUrl: (
+      asStr(parsed.openVsCodeHostedUrl, base.openVsCodeHostedUrl) || base.openVsCodeHostedUrl
+    ).replace(/\/$/, ''),
+    openVsCodeConnectionToken:
+      asStr(parsed.openVsCodeConnectionToken, base.openVsCodeConnectionToken) ||
+      base.openVsCodeConnectionToken ||
+      envOpenVsCodeToken(),
     openVsCodePort: asNum(parsed.openVsCodePort, base.openVsCodePort),
-    azingApiRoot: normalizeAzingApiRoot(asStr(parsed.azingApiRoot, base.azingApiRoot)),
+    marketplaceCatalogUrl: asStr(parsed.marketplaceCatalogUrl, base.marketplaceCatalogUrl),
 
-    chatPlatform: asEnum(
-      parsed.chatPlatform,
-      ['teams', 'slack', 'mattermost', 'google_chat', 'none'] as const,
-      base.chatPlatform,
-    ),
-    chatCredential: asStr(parsed.chatCredential, base.chatCredential),
-    meetingPlatform: asEnum(
-      parsed.meetingPlatform,
-      ['zoom', 'teams', 'slack', 'google_meet', 'none'] as const,
-      base.meetingPlatform,
-    ),
-    meetingCredential: asStr(parsed.meetingCredential, base.meetingCredential),
-    mailImapHost: asStr(parsed.mailImapHost, base.mailImapHost),
-    mailImapPort: asNum(parsed.mailImapPort, base.mailImapPort),
-    mailImapUser: asStr(parsed.mailImapUser, base.mailImapUser),
-    mailImapPassword: asStr(parsed.mailImapPassword, base.mailImapPassword),
-    mailImapTls: asBool(parsed.mailImapTls, base.mailImapTls),
-    mailPopHost: asStr(parsed.mailPopHost, base.mailPopHost),
-    mailPopPort: asNum(parsed.mailPopPort, base.mailPopPort),
+    enterpriseLicenseKey: asStr(parsed.enterpriseLicenseKey, base.enterpriseLicenseKey),
+    enterpriseLicenseOrgId: asStr(parsed.enterpriseLicenseOrgId, base.enterpriseLicenseOrgId),
+    enterpriseActivationEmail: asStr(parsed.enterpriseActivationEmail, base.enterpriseActivationEmail),
+    enterpriseActivationCode: asStr(parsed.enterpriseActivationCode, base.enterpriseActivationCode),
+    orgWorkspaceTag: asStr(parsed.orgWorkspaceTag, base.orgWorkspaceTag),
+
     mailPopUser: asStr(parsed.mailPopUser, base.mailPopUser),
     mailPopPassword: asStr(parsed.mailPopPassword, base.mailPopPassword),
     mailPopTls: asBool(parsed.mailPopTls, base.mailPopTls),
@@ -444,7 +590,7 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
       asStr(parsed.ollamaBaseUrl, base.ollamaBaseUrl).replace(/\/$/, '') || base.ollamaBaseUrl,
     llmProvider: asEnum(
       parsed.llmProvider,
-      ['ollama', 'openai', 'anthropic', 'azure', 'bedrock', 'grok', 'custom'] as const,
+      ['ollama', 'openai', 'custom'] as const,
       base.llmProvider,
     ),
     llmModel: asStr(parsed.llmModel, base.llmModel),
@@ -452,13 +598,6 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
       asStr(parsed.llmByokBaseUrl, base.llmByokBaseUrl).replace(/\/$/, '') || base.llmByokBaseUrl,
     llmByokApiKey: asStr(parsed.llmByokApiKey, base.llmByokApiKey),
     llmByokOrg: asStr(parsed.llmByokOrg, base.llmByokOrg),
-
-    browserHomePage: asStr(parsed.browserHomePage, base.browserHomePage),
-    browserSearchEngine: asEnum(
-      parsed.browserSearchEngine,
-      ['google', 'duckduckgo', 'bing'] as const,
-      base.browserSearchEngine,
-    ),
   };
 }
 

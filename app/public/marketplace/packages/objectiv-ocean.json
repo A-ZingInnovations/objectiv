@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "id": "azing.theme.objectiv-ocean",
+    "name": "Objectiv Ocean",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Cool ocean workbench palette for Objectiv.",
+    "kind": "theme",
+    "contributes": {
+      "workbenchColorTheme": "objectiv-ocean",
+      "accentColor": "#38bdf8"
+    }
+  }
+}

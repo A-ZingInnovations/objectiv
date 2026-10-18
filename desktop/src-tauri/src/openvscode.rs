@@ -1,4 +1,3 @@
-use std::fs;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -62,10 +61,20 @@ fn resolve_openvscode_bin() -> Result<PathBuf, String> {
             return Ok(bin);
         }
     }
-    Err(
-        "OpenVSCode Server not installed. Run: bash scripts/install-openvscode-server.sh"
-            .into(),
-    )
+    #[cfg(target_os = "macos")]
+    {
+        return Err(
+            "OpenVSCode Server not installed. On macOS it runs via Docker — start Docker Desktop, then run: bash scripts/install-openvscode-server.sh"
+                .into(),
+        );
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(
+            "OpenVSCode Server not installed. Run: bash scripts/install-openvscode-server.sh"
+                .into(),
+        )
+    }
 }
 
 fn wait_for_port(host: &str, port: u16, timeout: Duration) -> Result<(), String> {
@@ -104,12 +113,6 @@ pub fn openvscode_start(
     }
 
     let bin = resolve_openvscode_bin()?;
-    let home = home_dir()?;
-    let user_data = home.join(".objectiv/openvscode-server-data");
-    let extensions_dir = home.join(".objectiv/apps");
-    fs::create_dir_all(&user_data).map_err(|e| e.to_string())?;
-    fs::create_dir_all(&extensions_dir).map_err(|e| e.to_string())?;
-
     let child = Command::new(&bin)
         .arg("--host")
         .arg("127.0.0.1")
@@ -117,10 +120,6 @@ pub fn openvscode_start(
         .arg(port.to_string())
         .arg("--without-connection-token")
         .arg("--accept-server-license-terms")
-        .arg("--user-data-dir")
-        .arg(&user_data)
-        .arg("--extensions-dir")
-        .arg(&extensions_dir)
         .arg("--default-folder")
         .arg(root.as_os_str())
         .current_dir(&root)

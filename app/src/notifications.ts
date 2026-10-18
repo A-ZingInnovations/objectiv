@@ -2,6 +2,14 @@
 
 export type NotificationKind = 'chat' | 'mail' | 'meeting';
 
+export type SlackNotificationMeta = {
+  channelId: string;
+  teamId: string;
+  teamName: string;
+  channelTitle: string;
+  messageTs: string;
+};
+
 export type ObjectivNotification = {
   id: string;
   kind: NotificationKind;
@@ -14,7 +22,10 @@ export type ObjectivNotification = {
   threadId?: string;
   createdAt: number;
   read: boolean;
+  slack?: SlackNotificationMeta;
 };
+
+export const OBJECTIV_PUSH_NOTIFICATION = 'objectiv:push-notification';
 
 export type NotificationPrefs = {
   notifyChat: boolean;
@@ -55,11 +66,11 @@ export function sampleNotifications(): ObjectivNotification[] {
     {
       id: 'n_demo_chat_1',
       kind: 'chat',
-      platform: 'Slack',
-      title: 'New message in #pilot',
-      body: 'Can Objective draft the release note for Friday?',
-      from: '@maya',
-      threadId: 'slack:#pilot',
+      platform: 'Lucid · Slack',
+      title: 'New message in #lfras-phase-one',
+      body: 'Objectiv release: post standup thread to OpenProject?',
+      from: '@lfras-bot',
+      threadId: 'slack:#lfras-phase-one',
       createdAt: now - 2 * 60_000,
       read: false,
     },

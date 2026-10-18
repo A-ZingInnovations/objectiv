@@ -7,13 +7,9 @@ export type MenuActions = {
   openFolder: () => void;
   openFile: () => void;
   addFolderToWorkspace: () => void;
-  openWorkspaceFromFile: () => void;
-  saveWorkspace: () => void;
-  saveWorkspaceAs: () => void;
   closeFolder: () => void;
   quitApp: () => void;
   showPanel: (panel: ActivityPanel) => void;
-  openLlmSuiteSettings?: () => void;
   onSyncExport: () => void;
   onSyncImport: () => void;
   saveFile?: () => void;
@@ -42,6 +38,7 @@ const VIEW_ITEMS: { panel: ActivityPanel; label: string }[] = [
   { panel: 'run', label: 'Run and Debug' },
   { panel: 'extensions', label: 'Extensions' },
   { panel: 'chat', label: 'Objective Agent' },
+  { panel: 'llm', label: 'LLM Suite' },
   { panel: 'terminal', label: 'Terminal' },
   { panel: 'settings', label: 'Settings' },
 ];
@@ -51,13 +48,9 @@ export default function AppMenuBar({
   openFolder,
   openFile,
   addFolderToWorkspace,
-  openWorkspaceFromFile,
-  saveWorkspace,
-  saveWorkspaceAs,
   closeFolder,
   quitApp,
   showPanel,
-  openLlmSuiteSettings,
   onSyncExport,
   onSyncImport,
   workspaceOpen = false,
@@ -129,9 +122,6 @@ export default function AppMenuBar({
                 {item('Open File…', openFile)}
                 {item('Open Folder…', openFolder)}
                 {item('Add Folder to Workspace…', addFolderToWorkspace)}
-                {item('Open Workspace from File…', openWorkspaceFromFile)}
-                {item('Save Workspace', saveWorkspace, !workspaceOpen)}
-                {item('Save Workspace As…', saveWorkspaceAs, !workspaceOpen)}
                 {item('Close All Folders', closeFolder, !workspaceOpen)}
                 <div className="menu-dropdown-sep" />
                 {item('Save', () => saveFile?.(), !saveFile, '⌘S')}
@@ -259,7 +249,6 @@ export default function AppMenuBar({
                 </div>
                 <div className="menu-dropdown-sep" />
                 {VIEW_ITEMS.map(({ panel, label }) => item(label, () => showPanel(panel)))}
-                {item('LLM Suite…', () => openLlmSuiteSettings?.(), !openLlmSuiteSettings)}
               </>
             ),
           },

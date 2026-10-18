@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "id": "azing.theme.objectiv-graphite",
+    "name": "Objectiv Graphite",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Neutral graphite shell for long coding sessions.",
+    "kind": "theme",
+    "contributes": {
+      "workbenchColorTheme": "objectiv-graphite",
+      "accentColor": "#94a3b8"
+    }
+  }
+}

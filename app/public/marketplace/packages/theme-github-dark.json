@@ -1,0 +1,21 @@
+{
+  "manifest": {
+    "id": "vscode-port.github-dark",
+    "name": "GitHub Dark (VS Code port)",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "GitHub Dark Default–inspired shell colors for Objectiv.",
+    "kind": "theme",
+    "contributes": {
+      "workbenchColorTheme": "dark-plus",
+      "accentColor": "#2f81f7",
+      "cssVars": {
+        "--editor-bg": "#0d1117",
+        "--editor-fg": "#c9d1d9",
+        "--side-bar-bg": "#010409",
+        "--tab-active-bg": "#0d1117",
+        "--status-bar-bg": "#010409"
+      }
+    }
+  }
+}

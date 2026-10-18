@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import FileTypeIcon from './FileTypeIcon';
+import IntegrationBrandIcon from './IntegrationBrandIcon';
+import type { IntegrationToolbarAction } from '../integrations/integrationActivity';
+import { isMeetingTab } from '../meetingTab';
+import { isSlackChatTab } from '../slackChat';
 
 type Props = {
   openTabs: string[];
@@ -11,6 +15,11 @@ type Props = {
   onReorder?: (fromIndex: number, toIndex: number) => void;
   onSplit?: () => void;
   splitActive?: boolean;
+  messagingOpen?: boolean;
+  onToggleMessaging?: () => void;
+  /** Renders before the messaging toggle (e.g. notifications bell). */
+  toolbarStart?: ReactNode;
+  integrationToolbar?: IntegrationToolbarAction[];
 };
 
 type CtxMenu = {
@@ -42,6 +51,10 @@ export default function TabBar({
   onReorder,
   onSplit,
   splitActive,
+  messagingOpen: _messagingOpen,
+  onToggleMessaging: _onToggleMessaging,
+  toolbarStart,
+  integrationToolbar,
 }: Props) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -136,6 +149,10 @@ export default function TabBar({
             >
               {path.startsWith('browser:') ? (
                 <span className="codicon codicon-globe tab-icon" aria-hidden />
+              ) : isSlackChatTab(path) ? (
+                <IntegrationBrandIcon brand="slack" size={16} className="tab-icon" />
+              ) : isMeetingTab(path) ? (
+                <IntegrationBrandIcon brand="zoom" size={16} className="tab-icon" />
               ) : (
                 <FileTypeIcon path={path} className="tab-icon" size="sm" />
               )}
@@ -160,6 +177,24 @@ export default function TabBar({
         })}
         {dropIndex === openTabs.length && <div className="tab-drop-end" />}
       </div>
+      {(toolbarStart || (integrationToolbar && integrationToolbar.length > 0)) && (
+        <div className="tabs-actions">
+          {toolbarStart}
+          {integrationToolbar?.map((action) => (
+            <button
+              key={action.panel}
+              type="button"
+              className={`tab-action-btn ${action.active ? 'active' : ''}`}
+              title={action.title}
+              aria-label={action.title}
+              aria-pressed={action.active}
+              onClick={action.onClick}
+            >
+              <IntegrationBrandIcon brand={action.brand} size={18} />
+            </button>
+          ))}
+        </div>
+      )}
 
       {ctx && (
         <div

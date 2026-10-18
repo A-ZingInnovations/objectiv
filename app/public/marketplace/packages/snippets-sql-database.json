@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "vscode-port.sql-database",
+    "name": "SQL Database Essentials",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Queries, joins, and DDL snippets for SQL and database work.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "select basic",
+          "language": "sql",
+          "body": "SELECT ${1:column}\nFROM ${2:table}\nWHERE ${3:condition};\n"
+        },
+        {
+          "name": "left join",
+          "language": "sql",
+          "body": "SELECT ${1:a}.*, ${2:b}.*\nFROM ${3:table_a} AS a\nLEFT JOIN ${4:table_b} AS b ON a.${5:id} = b.${6:foreign_id};\n"
+        },
+        {
+          "name": "create table",
+          "language": "sql",
+          "body": "CREATE TABLE ${1:name} (\n  id BIGSERIAL PRIMARY KEY,\n  ${2:column} ${3:TYPE} NOT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n"
+        }
+      ]
+    }
+  }
+}

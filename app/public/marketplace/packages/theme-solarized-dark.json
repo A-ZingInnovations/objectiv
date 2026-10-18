@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "id": "objectiv.theme.solarized-dark",
+    "name": "Solarized Dark",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Classic Solarized dark base for editor and chrome.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#268bd2",
+      "cssVars": {
+        "--editor-bg": "#002b36",
+        "--editor-fg": "#839496",
+        "--side-bar-bg": "#073642",
+        "--activity-bar-bg": "#002b36",
+        "--tab-active-bg": "#073642",
+        "--tab-inactive-bg": "#002b36",
+        "--status-bar-bg": "#073642",
+        "--objectiv-accent": "#268bd2"
+      }
+    }
+  }
+}

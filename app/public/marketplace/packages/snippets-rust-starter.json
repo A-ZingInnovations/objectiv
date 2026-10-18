@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "azing.snippets.rust-starter",
+    "name": "Rust Starter",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "fn main, tests, and Result boilerplate.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "main",
+          "language": "rust",
+          "body": "fn main() {\n    ${1}\n}\n"
+        },
+        {
+          "name": "#[test]",
+          "language": "rust",
+          "body": "#[test]\nfn ${1:name}() {\n    ${2}\n}\n"
+        },
+        {
+          "name": "Result fn",
+          "language": "rust",
+          "body": "fn ${1:name}() -> Result<${2:()}, Box<dyn std::error::Error>> {\n    ${3}\n    Ok(())\n}\n"
+        }
+      ]
+    }
+  }
+}

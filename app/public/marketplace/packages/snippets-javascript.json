@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "vscode-port.javascript-snippets",
+    "name": "JavaScript Essentials (VS Code port)",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Common JS/TS snippets ported from VS Code defaults.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "log",
+          "language": "javascript",
+          "body": "console.log(${1:value});"
+        },
+        {
+          "name": "fetch json",
+          "language": "javascript",
+          "body": "const res = await fetch(${1:url});\nconst data = await res.json();\n"
+        },
+        {
+          "name": "arrow function",
+          "language": "typescript",
+          "body": "const ${1:name} = (${2:args}) => {\n\t${3}\n};\n"
+        }
+      ]
+    }
+  }
+}

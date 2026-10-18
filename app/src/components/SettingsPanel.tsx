@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useObjectivSettings } from '../settingsContext';
 import type { ObjectivSettings } from '../aziaiSettings';
 import {
@@ -7,10 +7,6 @@ import {
   WORKBENCH_COLOR_THEME_LABELS,
   normalizeAccentHex,
 } from '../objectivThemes';
-import LlmSuitePanel from './LlmSuitePanel';
-import AzingAccountSyncSection from './AzingAccountSyncSection';
-
-export const SETTINGS_CATEGORY_LLM_SUITE = 'LLM Suite';
 
 type Field =
   | {
@@ -309,28 +305,6 @@ const FIELDS: Field[] = [
     kind: 'toggle',
   },
 
-  // Browser
-  {
-    key: 'browserHomePage',
-    label: 'Home Page',
-    category: 'Browser',
-    section: 'Navigation',
-    kind: 'text',
-    placeholder: 'about:blank',
-  },
-  {
-    key: 'browserSearchEngine',
-    label: 'Search Engine',
-    category: 'Browser',
-    section: 'Navigation',
-    kind: 'select',
-    options: [
-      { value: 'google', label: 'Google' },
-      { value: 'duckduckgo', label: 'DuckDuckGo' },
-      { value: 'bing', label: 'Bing' },
-    ],
-  },
-
   // Terminal
   {
     key: 'defaultShell',
@@ -380,19 +354,66 @@ const FIELDS: Field[] = [
     step: 100,
   },
 
-  // Objective
+  // LLM Suite
   {
-    key: 'codexSyncWithLlmSuite',
-    label: 'Sync Codex model from LLM Suite',
-    category: 'Objective',
-    section: 'Codex platform',
-    kind: 'toggle',
+    key: 'ollamaBaseUrl',
+    label: 'Ollama Base URL',
+    category: 'LLM Suite',
+    section: 'Ollama',
+    kind: 'text',
+    placeholder: 'http://127.0.0.1:11434',
   },
+  {
+    key: 'llmProvider',
+    label: 'Active Provider',
+    category: 'LLM Suite',
+    section: 'Provider',
+    kind: 'select',
+    options: [
+      { value: 'ollama', label: 'Ollama (local)' },
+      { value: 'openai', label: 'OpenAI (BYOK)' },
+      { value: 'custom', label: 'Custom OpenAI-compatible (BYOK)' },
+    ],
+  },
+  {
+    key: 'llmModel',
+    label: 'Active Model',
+    category: 'LLM Suite',
+    section: 'Provider',
+    kind: 'text',
+    placeholder: 'llama3.2 or gpt-4o-mini',
+  },
+  {
+    key: 'llmByokBaseUrl',
+    label: 'BYOK Base URL',
+    category: 'LLM Suite',
+    section: 'BYOK',
+    kind: 'text',
+    placeholder: 'https://api.openai.com/v1',
+  },
+  {
+    key: 'llmByokApiKey',
+    label: 'BYOK API Key',
+    category: 'LLM Suite',
+    section: 'BYOK',
+    kind: 'text',
+    placeholder: 'sk-… (stored locally only)',
+  },
+  {
+    key: 'llmByokOrg',
+    label: 'BYOK Organization',
+    category: 'LLM Suite',
+    section: 'BYOK',
+    kind: 'text',
+    placeholder: 'org-… (optional)',
+  },
+
+  // Objective
   {
     key: 'sidecarUrl',
     label: 'Sidecar URL',
     category: 'Objective',
-    section: 'Codex platform',
+    section: 'Connection',
     kind: 'text',
     placeholder: 'http://127.0.0.1:8787',
   },
@@ -400,7 +421,7 @@ const FIELDS: Field[] = [
     key: 'pilotUser',
     label: 'Pilot User',
     category: 'Objective',
-    section: 'Codex platform',
+    section: 'Connection',
     kind: 'text',
     placeholder: 'pilot-local',
   },
@@ -445,6 +466,14 @@ const FIELDS: Field[] = [
     placeholder: 'Token or webhook for the selected platform',
   },
   {
+    key: 'slackAppToken',
+    label: 'Slack App Token (Socket Mode)',
+    category: 'Integrations',
+    section: 'Chat',
+    kind: 'text',
+    placeholder: 'xapp-… (connections:write) — enable Socket Mode on api.slack.com',
+  },
+  {
     key: 'meetingPlatform',
     label: 'Meetings Platform',
     category: 'Integrations',
@@ -464,7 +493,7 @@ const FIELDS: Field[] = [
     category: 'Integrations',
     section: 'Meetings',
     kind: 'text',
-    placeholder: 'API key / OAuth token for the selected platform',
+    placeholder: 'Zoom personal link (https://zoom.us/j/…) or API token',
   },
   {
     key: 'mailImapHost',
@@ -609,23 +638,13 @@ const FIELDS: Field[] = [
     kind: 'text',
     placeholder: 'Local profile',
   },
-  {
-    key: 'azingApiRoot',
-    label: 'A-Zing API root',
-    category: 'Account',
-    section: 'Profile',
-    kind: 'text',
-    placeholder: 'https://www.a-zing.org/api/v1',
-  },
 ];
 
 const CATEGORY_ORDER = [
   'Workbench',
   'Editor',
   'Files',
-  'Browser',
   'Terminal',
-  SETTINGS_CATEGORY_LLM_SUITE,
   'Objective',
   'Integrations',
   'Account',
@@ -638,12 +657,7 @@ function buildToc(): TocNode[] {
     if (!byCat.has(f.category)) byCat.set(f.category, new Set());
     byCat.get(f.category)!.add(f.section);
   }
-  const nodes: TocNode[] = CATEGORY_ORDER.filter(
-    (c) => c !== 'Sync' && (c === SETTINGS_CATEGORY_LLM_SUITE || byCat.has(c)),
-  ).map((cat) => {
-    if (cat === SETTINGS_CATEGORY_LLM_SUITE) {
-      return { id: cat, label: cat };
-    }
+  const nodes: TocNode[] = CATEGORY_ORDER.filter((c) => c !== 'Sync' && byCat.has(c)).map((cat) => {
     const sections = [...byCat.get(cat)!];
     return {
       id: cat,
@@ -661,14 +675,10 @@ function sectionId(category: string, section: string): string {
   return `${category}/${section}`;
 }
 
-export default function SettingsPanel({
-  onClose,
-  focusCategory,
-}: {
-  onClose?: () => void;
-  focusCategory?: string | null;
-}) {
-  const { settings, patchSettings, resetSettings } = useObjectivSettings();
+export default function SettingsPanel({ onClose }: { onClose?: () => void }) {
+  const { settings, patchSettings, resetSettings, exportSettings, importSettingsFromText } =
+    useObjectivSettings();
+  const importRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [activeId, setActiveId] = useState('Editor');
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
@@ -689,11 +699,9 @@ export default function SettingsPanel({
 
   const searching = query.trim().length > 0;
 
-  const showLlmSuite = !searching && activeId === SETTINGS_CATEGORY_LLM_SUITE;
-
   const visibleFields = useMemo(() => {
     if (searching) return filtered;
-    if (activeId === 'Sync' || activeId === SETTINGS_CATEGORY_LLM_SUITE) return [];
+    if (activeId === 'Sync') return [];
     if (activeId.includes('/')) {
       const [cat, sec] = activeId.split('/');
       return filtered.filter((f) => f.category === cat && f.section === sec);
@@ -725,12 +733,6 @@ export default function SettingsPanel({
       return next;
     });
   }, [searching, filtered]);
-
-  useEffect(() => {
-    if (!focusCategory) return;
-    setActiveId(focusCategory);
-    setQuery('');
-  }, [focusCategory]);
 
   function toggleExpand(id: string) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -785,7 +787,7 @@ export default function SettingsPanel({
     }
     if (field.kind === 'accentColor') {
       const accent = settings.accentColor;
-      const pickerValue = normalizeAccentHex(accent) ?? '#0a8083';
+      const pickerValue = normalizeAccentHex(accent) ?? '#007acc';
       return (
         <div key="accentColor" className="settings-row settings-accent-block">
           <span className="settings-row-label">{field.label}</span>
@@ -950,12 +952,6 @@ export default function SettingsPanel({
             </h2>
           )}
 
-          {showLlmSuite && (
-            <section className="settings-section settings-llm-suite">
-              <LlmSuitePanel embedded />
-            </section>
-          )}
-
           {groupedSections.map((group) => (
             <section key={group.id} className="settings-section">
               {(searching || !activeId.includes('/')) && (
@@ -975,8 +971,26 @@ export default function SettingsPanel({
             <section className="settings-section">
               {!searching && <h2 className="settings-page-title">Sync</h2>}
               {searching && <h3 className="settings-heading">Sync</h3>}
-              <AzingAccountSyncSection />
+              <p className="settings-note">Export / import JSON locally (no cloud Settings Sync).</p>
               <div className="settings-actions">
+                <button type="button" className="settings-btn" onClick={exportSettings}>
+                  Export settings…
+                </button>
+                <button type="button" className="settings-btn" onClick={() => importRef.current?.click()}>
+                  Import settings…
+                </button>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept="application/json,.json"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void file.text().then(importSettingsFromText);
+                    e.target.value = '';
+                  }}
+                />
                 <button type="button" className="settings-btn subtle" onClick={resetSettings}>
                   Reset to defaults
                 </button>

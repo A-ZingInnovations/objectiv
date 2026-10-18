@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "id": "azing.agent.objective-pilot",
+    "name": "Objective Pilot Tools",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Agent tool bundle for Objective sidecar.",
+    "kind": "agent-tool",
+    "contributes": {}
+  },
+  "files": {
+    "tools.json": "{\n  \"tools\": [\"workspace_scan\", \"sidecar_run\", \"git_status\"]\n}\n"
+  }
+}

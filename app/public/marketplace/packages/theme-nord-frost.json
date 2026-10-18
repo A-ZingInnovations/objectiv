@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "id": "objectiv.theme.nord-frost",
+    "name": "Nord Frost",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Arctic blue-gray palette inspired by Nord.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#88c0d0",
+      "cssVars": {
+        "--editor-bg": "#2e3440",
+        "--editor-fg": "#eceff4",
+        "--side-bar-bg": "#3b4252",
+        "--activity-bar-bg": "#2e3440",
+        "--tab-active-bg": "#3b4252",
+        "--tab-inactive-bg": "#2e3440",
+        "--status-bar-bg": "#3b4252",
+        "--objectiv-accent": "#88c0d0"
+      }
+    }
+  }
+}

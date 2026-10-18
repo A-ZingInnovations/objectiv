@@ -6,7 +6,11 @@
     "dev": "npm run dev --prefix app",
     "dev:backend": "python backend/main.py",
     "dev:desktop": "npm run dev --prefix desktop",
+    "reload": "bash scripts/objectiv-reload.sh",
     "build": "npm run build --prefix app",
-    "build:desktop": "npm run build --prefix app && npm run build --prefix desktop"
+    "build:desktop": "npm run build --prefix app && npm run build --prefix desktop",
+    "marketplace:lint": "node scripts/objv-cli.mjs catalog lint",
+    "marketplace:validate": "node scripts/objv-cli.mjs validate",
+    "marketplace:package": "node scripts/objv-cli.mjs package"
   }
 }

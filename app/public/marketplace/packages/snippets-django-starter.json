@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "azing.snippets.django-starter",
+    "name": "Django Starter",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Views, models, and URL patterns for Django projects.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "django view",
+          "language": "python",
+          "body": "from django.http import HttpRequest, HttpResponse\n\n\ndef ${1:view_name}(request: HttpRequest) -> HttpResponse:\n    ${2:pass}\n"
+        },
+        {
+          "name": "django model",
+          "language": "python",
+          "body": "from django.db import models\n\n\nclass ${1:ModelName}(models.Model):\n    ${2:pass}\n\n    class Meta:\n        ${3:pass}\n"
+        },
+        {
+          "name": "path url",
+          "language": "python",
+          "body": "path('${1:route}/', views.${2:view_name}, name='${3:name}'),\n"
+        }
+      ]
+    }
+  }
+}

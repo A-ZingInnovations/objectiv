@@ -1,299 +1,252 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { fetchAppPackage } from '../marketplace/catalog';
+import { useMarketplace } from '../marketplace/useMarketplace';
+import type { MarketplaceCatalogEntry, ObjectivAppManifest } from '../marketplace/types';
+import ExtensionListingDetail from './ExtensionListingDetail';
 
-import { useObjectivSettings } from '../settingsContext';
-import { isTauriDesktop, openExternal } from '../desktopWorkspace';
-import type { ObjectivSettings } from '../aziaiSettings';
-import { catalogIconUrl, type CatalogEntry, type InstalledExtension } from '../marketplaceInstall';
-import { entryType } from '../marketplaceCatalogUtils';
-import type { useExtensionBench } from '../useExtensionBench';
-import ExtensionEnableSwitch from './ExtensionEnableSwitch';
-import MarketplaceCatalogList from './MarketplaceCatalogList';
-import SideBarSection from './SideBarSection';
-
-const OPEN_VSX = 'https://open-vsx.org/';
-const MARKETPLACE_WEB = 'https://marketplace.project-objectiv.com/';
-const OBJECTIVE_REPO =
-  'https://github.com/A-ZingInnovations/objective/tree/main/vscode-extension';
-const INSTALL_DOC =
-  'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_OPENVSCODE.md';
-
-export type ExtensionBenchApi = ReturnType<typeof useExtensionBench>;
-
-type Props = {
-  workspaceRoot: string | null;
-  openVsCodeUrl: string | null;
-  openVsCodeBusy: boolean;
-  onStartOpenVsCode: () => void;
-  onStopOpenVsCode: () => void;
-  onEmbedOpenVsCode: () => void;
-  patchSettings: (patch: Partial<ObjectivSettings>) => void;
-  bench: ExtensionBenchApi;
-  /** Extension id highlighted in lists (active editor tab). */
-  activeExtensionId: string | null;
-};
-
-function resolveExtensionPath(configured: string): string {
-  return configured.trim();
+function contributionSummary(manifest: ObjectivAppManifest): string[] {
+  const lines: string[] = [];
+  lines.push(`Kind: ${manifest.kind}`);
+  const c = manifest.contributes;
+  if (!c) return lines;
+  if (manifest.kind === 'theme') {
+    if (c.workbenchColorTheme) lines.push(`Workbench theme: ${c.workbenchColorTheme}`);
+    if (c.accentColor) lines.push(`Accent: ${c.accentColor}`);
+    if (c.cssVars && Object.keys(c.cssVars).length) {
+      lines.push(`CSS variables: ${Object.keys(c.cssVars).length}`);
+    }
+  }
+  if (manifest.kind === 'snippets' && c.snippets?.length) {
+    for (const s of c.snippets.slice(0, 12)) {
+      lines.push(`Snippet · ${s.language}: ${s.name}`);
+    }
+    if (c.snippets.length > 12) {
+      lines.push(`… and ${c.snippets.length - 12} more`);
+    }
+  }
+  if (manifest.kind === 'config' && c.editor) {
+    for (const [k, v] of Object.entries(c.editor)) {
+      lines.push(`${k}: ${String(v)}`);
+    }
+  }
+  return lines;
 }
 
-export default function ExtensionsPanel({
-  workspaceRoot,
-  openVsCodeUrl,
-  openVsCodeBusy,
-  onStartOpenVsCode,
-  onStopOpenVsCode,
-  onEmbedOpenVsCode,
-  patchSettings,
-  bench,
-  activeExtensionId,
-}: Props) {
-  const { settings } = useObjectivSettings();
-  const extPath = resolveExtensionPath(settings.objectiveExtensionPath);
-  const [installedOpen, setInstalledOpen] = useState(true);
-  const [marketplaceOpen, setMarketplaceOpen] = useState(true);
-  const [moreOpen, setMoreOpen] = useState(false);
+function ExtensionActions({
+  entry,
+  mp,
+}: {
+  entry: MarketplaceCatalogEntry;
+  mp: ReturnType<typeof useMarketplace>;
+}) {
+  const inst = mp.installedFor(entry.id);
+  const busy = mp.busyId === entry.id;
 
-  const {
-    notice,
-    installed,
-    catalogById,
-    busyId,
-    installedIds,
-    enabledIds,
-    installedById,
-    openExtensionDetail,
-    setExtensionEnabledState,
-    removeExtension,
-    installFromArchive,
-    installFromFolder,
-    onInstalledFromList,
-    onEnabledFromList,
-    onErrorFromList,
-  } = bench;
-
-  const openInstalled = (ext: InstalledExtension) => {
-    openExtensionDetail({
-      source: 'installed',
-      ext,
-      catalog: catalogById.get(ext.id) ?? null,
-    });
-  };
-
-  const openMarketplace = (entry: CatalogEntry) => {
-    openExtensionDetail({
-      source: 'marketplace',
-      entry,
-      installed: installedById(entry.id),
-    });
-  };
+  if (!inst) {
+    return (
+      <button
+        type="button"
+        className="marketplace-btn primary"
+        disabled={busy}
+        onClick={() => void mp.install(entry)}
+      >
+        {busy ? 'Installing…' : 'Install'}
+      </button>
+    );
+  }
 
   return (
-    <div className="extensions-side-panel side-bar-scroll">
-      <div className="side-bar-title">EXTENSIONS</div>
-      {notice && <p className="extensions-install-notice">{notice}</p>}
-      <p className="extensions-sidebar-hint">Select an extension to open its details in the editor.</p>
-
-      <SideBarSection
-        title="Installed"
-        count={installed.length}
-        open={installedOpen}
-        onToggle={() => setInstalledOpen((v) => !v)}
-      >
-        {installed.length === 0 ? (
-          <p className="sidebar-section-empty">No extensions installed</p>
-        ) : (
-          <ul className="mp-inapp-list extensions-installed-list">
-            {installed.map((ext) => {
-              const catalog = catalogById.get(ext.id);
-              const icon = catalog ? catalogIconUrl(catalog) : null;
-              const subtitle = ext.kind ?? (catalog ? entryType(catalog) : 'Extension');
-              const rowBusy = busyId === ext.id;
-              return (
-                <li
-                  key={ext.id}
-                  className={`mp-inapp-row extensions-installed-row ${activeExtensionId === ext.id ? 'selected' : ''}`}
-                >
-                  {icon ? (
-                    <img className="mp-inapp-icon" src={icon} alt="" width={32} height={32} />
-                  ) : (
-                    <span className="mp-inapp-icon-fallback" aria-hidden>
-                      {ext.name.charAt(0)}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="mp-inapp-meta mp-inapp-meta-btn"
-                    onClick={() => openInstalled(ext)}
-                  >
-                    <span className="mp-inapp-name">{ext.name}</span>
-                    <span className="mp-inapp-cat">{subtitle}</span>
-                  </button>
-                  <div className="extensions-installed-actions">
-                    <ExtensionEnableSwitch
-                      enabled={ext.enabled}
-                      busy={rowBusy}
-                      disabled={!isTauriDesktop()}
-                      label={`${ext.enabled ? 'Disable' : 'Enable'} ${ext.name}`}
-                      onChange={(on) => setExtensionEnabledState(ext, on)}
-                    />
-                    <button
-                      type="button"
-                      className="extensions-row-btn extensions-row-btn-danger"
-                      disabled={!isTauriDesktop() || rowBusy}
-                      onClick={() => removeExtension(ext)}
-                    >
-                      Uninstall
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </SideBarSection>
-
-      <SideBarSection
-        title="Marketplace"
-        open={marketplaceOpen}
-        onToggle={() => setMarketplaceOpen((v) => !v)}
-        className="extensions-marketplace-section"
-      >
-        <MarketplaceCatalogList
-          settings={settings}
-          patchSettings={patchSettings}
-          installedIds={installedIds}
-          enabledIds={enabledIds}
-          onInstalled={onInstalledFromList}
-          onEnabled={onEnabledFromList}
-          onSetEnabled={(id, enabled) => {
-            const ext = installedById(id);
-            if (ext) setExtensionEnabledState(ext, enabled);
-          }}
-          onError={onErrorFromList}
-          selectedId={activeExtensionId}
-          onSelectEntry={openMarketplace}
+    <div className="marketplace-detail-actions-row">
+      <label className="marketplace-toggle">
+        <input
+          type="checkbox"
+          checked={inst.enabled}
+          disabled={busy}
+          onChange={(e) => void mp.toggleEnabled(entry.id, e.target.checked)}
         />
-      </SideBarSection>
-
-      <SideBarSection
-        title="More"
-        open={moreOpen}
-        onToggle={() => setMoreOpen((v) => !v)}
+        Enabled
+      </label>
+      <button
+        type="button"
+        className="marketplace-btn"
+        disabled={busy}
+        onClick={() => void mp.uninstall(entry.id)}
       >
-        <ul className="extensions-list sidebar-section-list">
-          <li>
-            <button
-              type="button"
-              className="extensions-action"
-              disabled={!isTauriDesktop()}
-              onClick={() => void openExternal(MARKETPLACE_WEB)}
-            >
-              <span className="codicon codicon-globe" aria-hidden />
-              Marketplace in browser
-            </button>
-          </li>
-          {isTauriDesktop() && (
-            <li>
-              <button type="button" className="extensions-action" onClick={installFromArchive}>
-                <span className="codicon codicon-cloud-download" aria-hidden />
-                Install from VSIX-like pack…
-              </button>
-            </li>
-          )}
-          {isTauriDesktop() && (
-            <li>
-              <button type="button" className="extensions-action" onClick={installFromFolder}>
-                <span className="codicon codicon-folder-opened" aria-hidden />
-                Install from folder…
-              </button>
-            </li>
-          )}
-          {isTauriDesktop() && (
-            <li>
-              <button
-                type="button"
-                className="extensions-action"
-                disabled={!workspaceRoot || openVsCodeBusy}
-                onClick={() => {
-                  if (openVsCodeUrl) onEmbedOpenVsCode();
-                  else onStartOpenVsCode();
-                }}
-              >
-                <span className="codicon codicon-extensions" aria-hidden />
-                {openVsCodeUrl ? 'VS Code extensions (embedded)' : 'Start OpenVSCode Server'}
-              </button>
-            </li>
-          )}
-          {isTauriDesktop() && openVsCodeUrl && (
-            <>
-              <li>
-                <button
-                  type="button"
-                  className="extensions-action"
-                  disabled={openVsCodeBusy}
-                  onClick={onStartOpenVsCode}
-                >
-                  <span className="codicon codicon-server-environment" aria-hidden />
-                  Restart OpenVSCode Server
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  className="extensions-action"
-                  disabled={openVsCodeBusy}
-                  onClick={onStopOpenVsCode}
-                >
-                  <span className="codicon codicon-debug-stop" aria-hidden />
-                  Stop OpenVSCode Server
-                </button>
-              </li>
-            </>
-          )}
-          <li>
-            <button
-              type="button"
-              className="extensions-action"
-              onClick={() => void openExternal(OPEN_VSX)}
-            >
-              <span className="codicon codicon-link-external" aria-hidden />
-              Open VSX
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className="extensions-action"
-              onClick={() => void openExternal(INSTALL_DOC)}
-            >
-              <span className="codicon codicon-book" aria-hidden />
-              OpenVSCode docs
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              className="extensions-action"
-              onClick={() => void openExternal(OBJECTIVE_REPO)}
-            >
-              <span className="codicon codicon-hubot" aria-hidden />
-              Objective extension (GitHub)
-            </button>
-          </li>
-          {isTauriDesktop() && extPath && (
-            <li>
-              <button
-                type="button"
-                className="extensions-action"
-                onClick={() => void openExternal(extPath)}
-              >
-                <span className="codicon codicon-folder-opened" aria-hidden />
-                Open extension folder
-              </button>
-            </li>
-          )}
-        </ul>
-      </SideBarSection>
+        Uninstall
+      </button>
     </div>
+  );
+}
+
+function ExtensionDetail({
+  entry,
+  mp,
+  onBack,
+}: {
+  entry: MarketplaceCatalogEntry;
+  mp: ReturnType<typeof useMarketplace>;
+  onBack: () => void;
+}) {
+  const icon = mp.entryIcon(entry);
+  const [manifest, setManifest] = useState<ObjectivAppManifest | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailLoading(true);
+    setDetailError(null);
+    setManifest(null);
+    void fetchAppPackage(entry.packageUrl, mp.catalogUrl)
+      .then((pkg) => {
+        if (!cancelled) setManifest(pkg.manifest);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setDetailError(e instanceof Error ? e.message : String(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.id, entry.packageUrl, mp.catalogUrl]);
+
+  const summary = manifest ? contributionSummary(manifest) : [];
+
+  return (
+    <div className="marketplace-detail">
+      <div className="marketplace-detail-header">
+        <button type="button" className="marketplace-back" onClick={onBack}>
+          <span className="codicon codicon-chevron-left" aria-hidden />
+          Marketplace
+        </button>
+      </div>
+      <ExtensionListingDetail
+        entry={entry}
+        catalogUrl={mp.catalogUrl}
+        iconUrl={icon}
+        actions={<ExtensionActions entry={entry} mp={mp} />}
+        contributions={summary.length ? summary : undefined}
+        contributionsLoading={detailLoading}
+        contributionsError={detailError}
+      />
+    </div>
+  );
+}
+
+export default function ExtensionsPanel() {
+  const mp = useMarketplace();
+  const [selected, setSelected] = useState<MarketplaceCatalogEntry | null>(null);
+
+  const openEntry = useCallback((entry: MarketplaceCatalogEntry) => {
+    setSelected(entry);
+  }, []);
+
+  const backToList = useCallback(() => setSelected(null), []);
+
+  if (selected) {
+    return (
+      <>
+        <div className="side-bar-title">MARKETPLACE</div>
+        <div className="extensions-panel-body marketplace-panel">
+          <ExtensionDetail entry={selected} mp={mp} onBack={backToList} />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="side-bar-title">MARKETPLACE</div>
+      <div className="extensions-panel-body marketplace-panel">
+        <div className="marketplace-toolbar">
+          <input
+            type="search"
+            className="marketplace-search"
+            placeholder="Search extensions"
+            value={mp.query}
+            onChange={(e) => mp.setQuery(e.target.value)}
+            aria-label="Search marketplace"
+          />
+          <button
+            type="button"
+            className="marketplace-icon-btn"
+            title="Refresh catalog"
+            disabled={mp.loading}
+            onClick={() => void mp.refreshCatalog()}
+          >
+            <span className={`codicon codicon-refresh ${mp.loading ? 'spin' : ''}`} aria-hidden />
+          </button>
+        </div>
+        <div className="marketplace-categories" role="tablist" aria-label="Categories">
+          {mp.categories.map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="tab"
+              aria-selected={mp.category === c}
+              className={`marketplace-chip ${mp.category === c ? 'active' : ''}`}
+              onClick={() => mp.setCategory(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        {mp.error && <p className="marketplace-error">{mp.error}</p>}
+        <ul className="marketplace-list marketplace-list-compact" role="list">
+          {mp.catalog.map((entry) => {
+            const inst = mp.installedFor(entry.id);
+            const icon = mp.entryIcon(entry);
+            return (
+              <li key={entry.id}>
+                <button
+                  type="button"
+                  className="marketplace-row"
+                  onClick={() => openEntry(entry)}
+                  aria-label={`Open ${entry.name} details`}
+                >
+                  <span className="marketplace-row-icon" aria-hidden>
+                    {icon ? (
+                      <img src={icon} alt="" width={32} height={32} />
+                    ) : (
+                      <span className="codicon codicon-extensions" />
+                    )}
+                  </span>
+                  <span className="marketplace-row-text">
+                    <span className="marketplace-row-title">
+                      <span className="marketplace-name">{entry.name}</span>
+                      {inst && (
+                        <span
+                          className={`marketplace-badge ${inst.enabled ? 'on' : 'off'}`}
+                          title={inst.enabled ? 'Enabled' : 'Disabled'}
+                        >
+                          {inst.enabled ? 'On' : 'Off'}
+                        </span>
+                      )}
+                    </span>
+                    <span className="marketplace-row-sub">
+                      {entry.publisher} · v{entry.version}
+                    </span>
+                    <span className="marketplace-row-desc">{entry.description}</span>
+                  </span>
+                  <span className="codicon codicon-chevron-right marketplace-row-chevron" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {!mp.loading && mp.catalog.length === 0 && !mp.error && (
+          <p className="extensions-path-hint">No extensions match your filters.</p>
+        )}
+        {mp.appsDir && (
+          <p className="extensions-path-hint marketplace-footer-hint">
+            Installed under <code>{mp.appsDir}</code>
+          </p>
+        )}
+      </div>
+    </>
   );
 }

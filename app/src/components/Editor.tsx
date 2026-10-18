@@ -5,7 +5,6 @@ import { ensurePythonLsp, ensureTypeScriptLsp } from '../lspClient';
 import type { FileDiagnostic } from '../diagnostics';
 import { isDiskPath, resolveDiskRel } from '../workspaceDisk';
 import { isTauriDesktop } from '../desktopWorkspace';
-import { getMarketplaceSnippets } from '../marketplaceRuntime';
 import type {
   CursorBlinkingSetting,
   CursorStyleSetting,
@@ -124,7 +123,6 @@ export default function CodeEditor({
     });
 
     void setupLsp(editor, monaco, path, value, workspaceRoot ?? null, lspReadyRef);
-    registerMarketplaceSnippets(monaco, editor.getModel()?.getLanguageId() ?? language);
 
     if (scrollToLine != null) {
       editor.revealLineInCenter(scrollToLine);
@@ -333,35 +331,6 @@ export default function CodeEditor({
       />
     </div>
   );
-}
-
-const snippetProviders = new Set<string>();
-
-function registerMarketplaceSnippets(monaco: typeof Monaco, langId: string) {
-  if (!langId || snippetProviders.has(langId)) return;
-  snippetProviders.add(langId);
-  monaco.languages.registerCompletionItemProvider(langId, {
-    provideCompletionItems: (model, position) => {
-      const word = model.getWordUntilPosition(position);
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn,
-      };
-      const lang = model.getLanguageId();
-      const suggestions = getMarketplaceSnippets()
-        .filter((s) => s.language === lang || s.language === langId)
-        .map((s) => ({
-          label: s.name,
-          kind: monaco.languages.CompletionItemKind.Snippet,
-          insertText: s.body,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range,
-        }));
-      return { suggestions };
-    },
-  });
 }
 
 async function setupLsp(

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "icons": "bash ../scripts/regenerate-objectiv-app-icons.sh",
     "build": "tauri build",
+    "reload": "bash ../scripts/objectiv-reload.sh",
     "relaunch": "bash ../scripts/objectiv-relaunch.sh",
     "stop": "bash ../scripts/objectiv-stop-all.sh"
   },

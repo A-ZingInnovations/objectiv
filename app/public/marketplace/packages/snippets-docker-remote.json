@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "vscode-port.docker-remote",
+    "name": "Docker & Remote Dev",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Compose overrides and docker context snippets for remote hosts.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "compose service",
+          "language": "yaml",
+          "body": "  ${1:service}:\n    image: ${2:image:tag}\n    ports:\n      - \"${3:8080:8080}\"\n    environment:\n      ${4:KEY}: ${5:value}\n"
+        },
+        {
+          "name": "docker context ssh",
+          "language": "shell",
+          "body": "docker context create ${1:remote} --docker \"host=ssh://${2:user}@${3:host}\"\ndocker context use ${1:remote}\n"
+        },
+        {
+          "name": "compose remote override",
+          "language": "yaml",
+          "body": "services:\n  ${1:app}:\n    volumes:\n      - ${2:./src}:/app/src\n    command: ${3:npm run dev}\n"
+        }
+      ]
+    }
+  }
+}

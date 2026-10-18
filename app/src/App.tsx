@@ -4,20 +4,18 @@ import ExplorerSidePanel from './components/ExplorerSidePanel';
 import BrowserPanelCompact from './components/BrowserPanelCompact';
 import AuxiliaryBarSplit from './components/AuxiliaryBarSplit';
 import MessagingPanel from './components/MessagingPanel';
+import MeetingsPanel from './components/MeetingsPanel';
+import IntegrationBrandIcon from './components/IntegrationBrandIcon';
 import WorkspaceRootPicker from './components/WorkspaceRootPicker';
 import TabBar from './components/TabBar';
-import { type AgentChatPanelHandle } from './components/AgentChatPanel';
-import ChatSidePanel from './components/ChatSidePanel';
+import AgentChatPanel, { type AgentChatPanelHandle } from './components/AgentChatPanel';
 import AgentApproveModal from './components/AgentApproveModal';
 import OutputPanel from './components/OutputPanel';
 import XtermTerminal from './components/XtermTerminal';
 import RunPanel from './components/RunPanel';
 import ExtensionsPanel from './components/ExtensionsPanel';
-import ExtensionDetail from './components/ExtensionDetail';
-import { useExtensionBench } from './useExtensionBench';
-import { extensionIdFromTab, isExtensionTab } from './extensionTabs';
-import { useMarketplaceInstallHandlers } from './useMarketplaceInstall';
-import SettingsPanel, { SETTINGS_CATEGORY_LLM_SUITE } from './components/SettingsPanel';
+import LlmSuitePanel from './components/LlmSuitePanel';
+import SettingsPanel from './components/SettingsPanel';
 import NotificationHost from './components/NotificationHost';
 import { PRODUCT_CODE, PRODUCT_NAME, PRODUCT_TAGLINE } from './branding';
 import WorkspaceWelcome, { type WelcomeShortcut } from './components/WorkspaceWelcome';
@@ -29,7 +27,6 @@ import CommandPalette, { type PaletteMode } from './components/CommandPalette';
 import TrustDialog from './components/TrustDialog';
 import UnsavedChangesDialog from './components/UnsavedChangesDialog';
 import { promptUnsavedClose, type UnsavedCloseChoice } from './unsavedClosePrompt';
-import OpenVsCodeFrame from './components/OpenVsCodeFrame';
 import SplitEditorArea, {
   type EditorPaneId,
   type EditorPaneProps,
@@ -38,16 +35,37 @@ import ProblemsPanel from './components/ProblemsPanel';
 import BottomPanel from './components/BottomPanel';
 import BrowserView from './components/BrowserView';
 import BrowserPanel from './components/BrowserPanel';
-import SftpExtensionPanel from './components/SftpExtensionPanel';
-import DevCentraExtensionPanel from './components/DevCentraExtensionPanel';
-import DevCentraToolPane from './components/DevCentraToolPane';
-import {
-  devcentraSlugFromTab,
-  devcentraToolTabId,
-  isDevCentraToolTab,
-} from './devcentraTabs';
+import SlackChatView from './components/SlackChatView';
 import { useBrowserWorkbench } from './useBrowserWorkbench';
-import { useWorkbenchPanels } from './useWorkbenchPanels';
+import { useSlackChatWorkbench } from './useSlackChatWorkbench';
+import { isSlackChatTab, slackChatTabTitle } from './slackChat';
+import { isMeetingTab, meetingTabTitle } from './meetingTab';
+import { meetingLinkLabel, normalizeMeetingJoinUrl } from './integrations/meetingLinks';
+import { useMeetingWorkbench } from './useMeetingWorkbench';
+import MeetingTabView from './components/MeetingTabView';
+import { slackWebClientUrl } from './integrations/slackNavigation';
+import { resolveSlackToken } from './integrations/slackToken';
+import {
+  integrationToolbarActions,
+  isChatIntegrationActive,
+} from './integrations/integrationActivity';
+import { fetchSlackWorkspace } from './integrations/slackLive';
+import {
+  SLACK_CHANNEL_POLL_IDLE_MS,
+  SLACK_CHANNEL_POLL_MS,
+  SLACK_WORKSPACE_POLL_MS,
+} from './integrations/slackMessageMerge';
+import {
+  listenSlackSocket,
+  startSlackSocket,
+  stopSlackSocket,
+} from './integrations/slackSocket';
+import {
+  ingestSlackWorkspaceForNotifications,
+  markSlackChannelSeen,
+  pushObjectivNotification,
+} from './integrations/slackNotificationWatch';
+import type { SlackNotificationActions } from './components/NotificationHost';
 import type { BottomPanelTab } from './bottomPanel';
 import { pushRecentFile } from './recentFiles';
 import {
@@ -61,14 +79,10 @@ import { diagnosticCount, type DiagnosticsByPath } from './diagnostics';
 import { mergeDiagnostics, validateOpenFiles } from './fileValidation';
 import { handlePublishDiagnostics, subscribeDiagnostics } from './lspDiagnostics';
 import { onLspPublishDiagnostics } from './lspClient';
-import {
-  openVsCodeStatus,
-  startOpenVsCodeServer,
-  stopOpenVsCodeServer,
-} from './openVsCodeServer';
 import DiffEditorPane from './components/DiffEditorPane';
 import { buildWorkbenchCommands } from './workbenchCommands';
 import { useWorkbenchKeyboard } from './useWorkbenchKeyboard';
+import { browserFixtureUrl, type BrowserFixtureId } from './browserPages';
 import { toggleBrowserDevtools } from './browserWebview';
 import type { PendingEdit } from './types';
 import type { ActivityPanel } from './activityPanels';
@@ -84,7 +98,6 @@ import {
 } from './fileViewers';
 import type { FileActions } from './types';
 import { useObjectivSettings } from './settingsContext';
-import { pushCodexModelToSidecar } from './codexSidecarModel';
 import {
   fetchSidecarConfig,
   isTauriDesktop,
@@ -92,10 +105,6 @@ import {
   pathIsDir,
   pickWorkspaceFolder,
   pickWorkspaceFile,
-  pickWorkspaceDefinitionFile,
-  pickSaveWorkspaceDefinitionFile,
-  readTextFileAbsolute,
-  writeTextFileAbsolute,
   readWorkspaceFile,
   readWorkspaceFileBytes,
   scanWorkspace,
@@ -128,13 +137,6 @@ import { explorerPathIsDir } from './explorerDnd';
 import { appendOutput, setOutput as setGlobalOutput } from './outputChannel';
 import { indexWorkspaceSymbols } from './workspaceSymbols';
 import { sessionIdForWorkspace } from './objectiveSidecar';
-import {
-  buildWorkspaceDefinitionFile,
-  defaultWorkspaceSaveName,
-  parseWorkspaceDefinitionJson,
-  serializeWorkspaceDefinitionFile,
-  type ParsedWorkspaceDefinition,
-} from './workspaceFile';
 import type { SidecarConfig } from './objectiveSidecar';
 import { useIsTauriDesktop } from './useIsTauriDesktop';
 import SidebarSplit from './components/SidebarSplit';
@@ -174,7 +176,6 @@ function diffTabId(pending: PendingEdit): string {
 
 export default function App() {
   const { settings, patchSettings, exportSettings, importSettingsFromText } = useObjectivSettings();
-  const [marketplaceInstallMsg, setMarketplaceInstallMsg] = useState<string | null>(null);
   const isDesktop = useIsTauriDesktop();
   const sidecarUrl = settings.sidecarUrl.replace(/\/$/, '');
 
@@ -186,11 +187,6 @@ export default function App() {
   const [recentWorkspacePaths, setRecentWorkspacePaths] = useState<string[]>([]);
   const [searchScopeFolder, setSearchScopeFolder] = useState<string | null>(null);
   const folderActionRef = useRef<'open' | 'add'>('open');
-  const [workspaceDefinitionPath, setWorkspaceDefinitionPath] = useState<string | null>(null);
-  const pendingWorkspaceRestoreRef = useRef<{
-    parsed: ParsedWorkspaceDefinition;
-    definitionPath: string;
-  } | null>(null);
   const [paletteMode, setPaletteMode] = useState<PaletteMode>('commands');
   const [breakpoints, setBreakpoints] = useState<Record<string, number[]>>({});
   const [filePaths, setFilePaths] = useState<string[]>([]);
@@ -201,61 +197,13 @@ export default function App() {
   const [binaryFallbackPaths, setBinaryFallbackPaths] = useState<Set<string>>(() => new Set());
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [devcentraTabTitles, setDevcentraTabTitles] = useState<Record<string, string>>({});
   const [panel, setPanel] = useState<ActivityPanel>('explorer');
-  const workbenchPanels = useWorkbenchPanels();
-  const extensionActivityItems = useMemo(
-    () =>
-      workbenchPanels.map((p) => ({
-        id: p.panelId as ActivityPanel,
-        codicon: p.icon,
-        title: p.title,
-      })),
-    [workbenchPanels],
-  );
-  useEffect(() => {
-    if (panel === 'remote-sftp' && !workbenchPanels.some((w) => w.panelId === 'remote-sftp')) {
-      setPanel('explorer');
-    }
-    if (panel === 'devcentra' && !workbenchPanels.some((w) => w.panelId === 'devcentra')) {
-      setPanel('explorer');
-    }
-  }, [panel, workbenchPanels]);
-  useMarketplaceInstallHandlers({
-    patchSettings,
-    getSettings: () => settings,
-    sidecarUrl,
-    onInstalled: ({ name }) => {
-      setPanel('extensions');
-      setMarketplaceInstallMsg(`Installed ${name}`);
-      window.setTimeout(() => setMarketplaceInstallMsg(null), 8000);
-    },
-    onError: (message) => setMarketplaceInstallMsg(message),
-  });
-
-  const openExtensionTab = useCallback((tabId: string) => {
-    setOpenTabs((t) => (t.includes(tabId) ? t : [...t, tabId]));
-    setActiveTab(tabId);
-    setPanel('extensions');
-  }, []);
-
-  const extensionBench = useExtensionBench({
-    settings,
-    patchSettings,
-    marketplaceInstallMsg,
-    onOpenExtensionTab: openExtensionTab,
-  });
-  const { clearExtensionTab: clearExtensionDetailTab } = extensionBench;
-
-  const activeExtensionId =
-    activeTab && isExtensionTab(activeTab) ? extensionIdFromTab(activeTab) : null;
-  const activeExtensionSelection = extensionBench.selectionForActiveTab(activeTab);
-
-  const [settingsFocusCategory, setSettingsFocusCategory] = useState<string | null>(null);
-  const browserWb = useBrowserWorkbench({
-    searchEngine: settings.browserSearchEngine,
-    homePage: settings.browserHomePage,
-  });
+  const [slackPanelMounted, setSlackPanelMounted] = useState(false);
+  const browserWb = useBrowserWorkbench();
+  const slackChatWb = useSlackChatWorkbench();
+  const meetingWb = useMeetingWorkbench();
+  const prefetchSlackHistoriesRef = useRef(slackChatWb.prefetchWorkspaceHistories);
+  prefetchSlackHistoriesRef.current = slackChatWb.prefetchWorkspaceHistories;
   const sideBarVisible = settings.sideBarVisible;
   const setSideBarVisible = useCallback(
     (next: boolean | ((prev: boolean) => boolean)) => {
@@ -274,9 +222,6 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [diffTabs, setDiffTabs] = useState<Record<string, DiffTabPayload>>({});
   const [agentPending, setAgentPending] = useState<PendingEdit | null>(null);
-  const [openVsCodeUrl, setOpenVsCodeUrl] = useState<string | null>(null);
-  const [openVsCodeBusy, setOpenVsCodeBusy] = useState(false);
-  const [editorSurface, setEditorSurface] = useState<'objectiv' | 'openvscode'>('objectiv');
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitTab, setSplitTab] = useState<string | null>(null);
   const [editorFocus, setEditorFocus] = useState<EditorPaneId>('primary');
@@ -319,27 +264,6 @@ export default function App() {
     return () => clearInterval(id);
   }, [sidecarUrl]);
 
-  useEffect(() => {
-    if (!sidecarUrl || !settings.codexSyncWithLlmSuite) return;
-    void pushCodexModelToSidecar(sidecarUrl, settings).then((r) => {
-      if (r.ok) {
-        void fetchSidecarConfig(sidecarUrl).then((cfg) => {
-          setSidecarMeta(cfg);
-          setSidecarRoot(cfg?.workspace ?? null);
-        });
-      }
-    });
-  }, [
-    sidecarUrl,
-    settings.codexSyncWithLlmSuite,
-    settings.llmProvider,
-    settings.llmModel,
-    settings.llmByokBaseUrl,
-    settings.llmByokApiKey,
-    settings.llmByokOrg,
-    settings.ollamaBaseUrl,
-  ]);
-
   const agentSessionId = useMemo(
     () => sessionIdForWorkspace(activeRoot),
     [activeRoot],
@@ -361,13 +285,6 @@ export default function App() {
     }
     setActiveRootIndex((i) => Math.min(i, workspaceRoots.length - 1));
   }, [workspaceRoots]);
-
-  useEffect(() => {
-    if (!isTauriDesktop()) return;
-    void openVsCodeStatus().then((s) => {
-      if (s.running && s.url) setOpenVsCodeUrl(s.url);
-    });
-  }, []);
 
   useEffect(() => {
     const unsub = onLspPublishDiagnostics((params) => {
@@ -393,38 +310,6 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [files, openTabs]);
 
-  const startOpenVsCode = useCallback(async () => {
-    if (!activeRoot) {
-      setSideBarVisible(true);
-      setPanel('extensions');
-      return;
-    }
-    setOpenVsCodeBusy(true);
-    try {
-      const url = await startOpenVsCodeServer(activeRoot, settings.openVsCodePort);
-      setOpenVsCodeUrl(url);
-      // Marketplace / extensions UI lives inside OpenVSCode — open it in-app, not the browser.
-      setEditorSurface('openvscode');
-      setSideBarVisible(true);
-      setPanel('extensions');
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    } finally {
-      setOpenVsCodeBusy(false);
-    }
-  }, [activeRoot, settings.openVsCodePort]);
-
-  const stopOpenVsCode = useCallback(async () => {
-    setOpenVsCodeBusy(true);
-    try {
-      await stopOpenVsCodeServer();
-      setOpenVsCodeUrl(null);
-      setEditorSurface('objectiv');
-    } finally {
-      setOpenVsCodeBusy(false);
-    }
-  }, []);
-
   const workspaceMismatch =
     mode === 'disk' &&
     activeRoot &&
@@ -442,12 +327,6 @@ export default function App() {
 
   const openFile = useCallback(
     async (path: string, opts?: { roots?: string[] }) => {
-      if (isExtensionTab(path)) {
-        setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
-        setActiveTab(path);
-        setPanel('extensions');
-        return;
-      }
       const display = displayPath(path);
       const kind = viewerKindFromPath(display);
       const needsBinary = isBinaryViewer(kind);
@@ -518,7 +397,6 @@ export default function App() {
     async (path: string, line: number) => {
       await openFile(path);
       setScrollTargets((s) => ({ ...s, [path]: line }));
-      setEditorSurface('objectiv');
     },
     [openFile],
   );
@@ -573,130 +451,11 @@ export default function App() {
     [activeRootIndex],
   );
 
-  const applyWorkspaceSnapshot = useCallback(
-    async (parsed: ParsedWorkspaceDefinition, definitionPath: string) => {
-      await applyFolderRoots(parsed.roots, true);
-      setWorkspaceDefinitionPath(definitionPath);
-      setActiveRootIndex(parsed.activeRootIndex);
-      if (parsed.openTabs.length > 0) {
-        setOpenTabs(parsed.openTabs);
-        const nextActive = parsed.activeTab ?? parsed.openTabs[0] ?? null;
-        setActiveTab(nextActive);
-        for (const tab of parsed.openTabs) {
-          if (isDiskPath(tab)) {
-            try {
-              await openFile(tab);
-            } catch {
-              /* tab may reference a removed file */
-            }
-          }
-        }
-      }
-      pendingWorkspaceRestoreRef.current = null;
-    },
-    [applyFolderRoots, openFile],
-  );
-
-  const finishOpenWorkspaceFromFile = useCallback(
-    async (parsed: ParsedWorkspaceDefinition, definitionPath: string) => {
-      for (const root of parsed.roots) {
-        if (!(await pathIsDir(root))) {
-          alert(`Folder not found:\n${root}`);
-          pendingWorkspaceRestoreRef.current = null;
-          return;
-        }
-      }
-      const untrusted = parsed.roots.find((r) => !isTrustedRoot(r));
-      if (untrusted) {
-        pendingWorkspaceRestoreRef.current = { parsed, definitionPath };
-        setTrustPrompt(untrusted);
-        return;
-      }
-      try {
-        await applyWorkspaceSnapshot(parsed, definitionPath);
-      } catch (e) {
-        console.error(e);
-        alert(`Open workspace failed: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    },
-    [applyWorkspaceSnapshot],
-  );
-
-  const openWorkspaceFromFile = useCallback(async () => {
-    if (!isTauriDesktop()) {
-      alert('Workspace files require the Objectiv desktop app.');
-      return;
-    }
-    try {
-      const filePath = await pickWorkspaceDefinitionFile();
-      if (!filePath) return;
-      const raw = await readTextFileAbsolute(filePath);
-      const parsed = parseWorkspaceDefinitionJson(raw, filePath);
-      await finishOpenWorkspaceFromFile(parsed, filePath);
-    } catch (e) {
-      console.error(e);
-      alert(`Open workspace failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }, [finishOpenWorkspaceFromFile]);
-
-  const writeWorkspaceDefinitionToPath = useCallback(
-    async (path: string) => {
-      const doc = buildWorkspaceDefinitionFile({
-        roots: workspaceRoots,
-        workspaceFilePath: path,
-        activeRootIndex,
-        openTabs,
-        activeTab,
-      });
-      await writeTextFileAbsolute(path, serializeWorkspaceDefinitionFile(doc));
-      setWorkspaceDefinitionPath(path);
-    },
-    [workspaceRoots, activeRootIndex, openTabs, activeTab],
-  );
-
-  const saveWorkspaceAs = useCallback(async () => {
-    if (!isTauriDesktop()) {
-      alert('Save workspace requires the Objectiv desktop app.');
-      return;
-    }
-    if (workspaceRoots.length === 0) {
-      alert('Open folders before saving a workspace file.');
-      return;
-    }
-    try {
-      const suggested =
-        workspaceDefinitionPath ?? defaultWorkspaceSaveName(workspaceRoots);
-      const path = await pickSaveWorkspaceDefinitionFile(suggested);
-      if (!path) return;
-      await writeWorkspaceDefinitionToPath(path);
-    } catch (e) {
-      console.error(e);
-      alert(`Save workspace failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }, [workspaceRoots, workspaceDefinitionPath, writeWorkspaceDefinitionToPath]);
-
-  const saveWorkspace = useCallback(async () => {
-    if (workspaceRoots.length === 0) {
-      alert('Open folders before saving a workspace file.');
-      return;
-    }
-    if (!workspaceDefinitionPath) {
-      await saveWorkspaceAs();
-      return;
-    }
-    try {
-      await writeWorkspaceDefinitionToPath(workspaceDefinitionPath);
-    } catch (e) {
-      console.error(e);
-      alert(`Save workspace failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }, [workspaceRoots, workspaceDefinitionPath, saveWorkspaceAs, writeWorkspaceDefinitionToPath]);
-
   const closeTabImmediate = useCallback(
     (path: string) => {
       browserWb.closeBrowserTab(path);
-      if (isExtensionTab(path)) {
-        clearExtensionDetailTab(path);
+      if (isMeetingTab(path)) {
+        meetingWb.closeMeetingTab(path);
       }
       if (path.startsWith('diff:')) {
         setDiffTabs((d) => {
@@ -747,7 +506,7 @@ export default function App() {
         return nextTabs;
       });
     },
-    [splitTab, browserWb, clearExtensionDetailTab],
+    [splitTab, browserWb, meetingWb],
   );
 
   const openDiffTab = useCallback((pending: PendingEdit) => {
@@ -916,7 +675,12 @@ export default function App() {
 
   const requestCloseTab = useCallback(
     async (path: string): Promise<boolean> => {
-      if (path.startsWith('diff:') || browserWb.isBrowserTab(path)) {
+      if (
+        path.startsWith('diff:') ||
+        browserWb.isBrowserTab(path) ||
+        isSlackChatTab(path) ||
+        isMeetingTab(path)
+      ) {
         closeTabImmediate(path);
         return true;
       }
@@ -1053,9 +817,6 @@ export default function App() {
         saveTimer.current = null;
       }
       void stopAllLsp();
-      void stopOpenVsCodeServer();
-      setOpenVsCodeUrl(null);
-      setEditorSurface('objectiv');
       setWorkspaceBusy(false);
       setMode('demo');
       setWorkspaceRoots([]);
@@ -1082,18 +843,14 @@ export default function App() {
       setSideBarVisible(true);
       setPanel('explorer');
       saveLastSessionWorkspaces([]);
-      setWorkspaceDefinitionPath(null);
-      pendingWorkspaceRestoreRef.current = null;
     },
     [mode, workspaceRoots, applyFolderRoots],
   );
 
   const commitFolderPick = useCallback(
     async (root: string) => {
-      pendingWorkspaceRestoreRef.current = null;
       // Multi-workspace: another Open Folder adds alongside existing roots.
       if (workspaceRoots.length === 0) {
-        setWorkspaceDefinitionPath(null);
         await applyFolderRoots([root], true);
         return;
       }
@@ -1306,11 +1063,6 @@ export default function App() {
     });
   }, [terminalPoppedOut, activeRoot]);
 
-  const openSettingsCategory = useCallback((category: string) => {
-    setSettingsFocusCategory(category);
-    setPanel('settings');
-  }, []);
-
   const openSidePanel = useCallback((p: ActivityPanel) => {
     if (p === 'settings') {
       setPanel('settings');
@@ -1331,7 +1083,6 @@ export default function App() {
         return;
       }
       if (p === 'settings') {
-        setSettingsFocusCategory(null);
         setPanel((current) => (current === 'settings' ? 'explorer' : 'settings'));
         return;
       }
@@ -1392,16 +1143,11 @@ export default function App() {
           keys: ['⌘', '⇧', 'O'],
           onClick: () => void openFolder(),
         },
-        {
-          label: 'Open Workspace from File',
-          keys: [],
-          onClick: () => void openWorkspaceFromFile(),
-        },
         ...commands,
       ];
     }
     return commands;
-  }, [hasWorkspaceOpen, showWorkbenchPanel, openFolder, openWorkspaceFromFile]);
+  }, [hasWorkspaceOpen, showWorkbenchPanel, openFolder]);
 
   const addFolderToWorkspace = useCallback(async () => {
     await pickFolderWithTrust('add');
@@ -1456,9 +1202,6 @@ export default function App() {
       if (id === 'file_open_file') void openFilePicker();
       else if (id === 'file_open_folder') void openFolder();
       else if (id === 'file_add_folder') void addFolderToWorkspace();
-      else if (id === 'file_open_workspace') void openWorkspaceFromFile();
-      else if (id === 'file_save_workspace') void saveWorkspace();
-      else if (id === 'file_save_workspace_as') void saveWorkspaceAs();
       else if (id === 'file_close_folder') {
         closeFolder();
       }
@@ -1502,9 +1245,6 @@ export default function App() {
       openFolder,
       openFilePicker,
       addFolderToWorkspace,
-      openWorkspaceFromFile,
-      saveWorkspace,
-      saveWorkspaceAs,
       closeFolder,
       exportSettings,
       showWorkbenchPanel,
@@ -2171,7 +1911,32 @@ export default function App() {
   }, [runWorkspaceScript]);
 
   const activeBrowserSession = browserWb.activeSessionFor(activeTab);
+  const activeSlackChat =
+    activeTab && isSlackChatTab(activeTab) ? slackChatWb.sessionForTab(activeTab) : undefined;
+  const activeMeeting =
+    activeTab && isMeetingTab(activeTab) ? meetingWb.sessionForTab(activeTab) : undefined;
   const browserTabActive = Boolean(activeBrowserSession);
+  const openIntegrationPanel = useCallback(
+    (p: 'messages' | 'meetings') => {
+      showWorkbenchPanel(p);
+    },
+    [showWorkbenchPanel],
+  );
+
+  const integrationToolbar = useMemo(
+    () => integrationToolbarActions(settings, panel, sideBarVisible, openIntegrationPanel),
+    [
+      settings.chatPlatform,
+      settings.chatCredential,
+      settings.meetingPlatform,
+      settings.meetingCredential,
+      panel,
+      sideBarVisible,
+      openIntegrationPanel,
+    ],
+  );
+  const slackToken = resolveSlackToken(settings.chatCredential);
+  const [slackSocketConnected, setSlackSocketConnected] = useState(false);
 
   const ensureBrowserEditorTab = useCallback(() => {
     if (activeBrowserSession) return activeBrowserSession.id;
@@ -2182,6 +1947,210 @@ export default function App() {
     setSideBarVisible(true);
     return id;
   }, [activeBrowserSession, browserWb]);
+
+  const openMeetingInTab = useCallback(
+    (url: string, title: string) => {
+      const id = meetingWb.openMeetingTab(url, title);
+      if (!id) return;
+      setOpenTabs((t) => {
+        const withoutBrowserDupes = t.filter((tabId) => {
+          if (!browserWb.isBrowserTab(tabId)) return true;
+          const sess = browserWb.browserSessions[tabId];
+          if (!sess) return true;
+          return normalizeMeetingJoinUrl(sess.url) !== normalizeMeetingJoinUrl(url);
+        });
+        return withoutBrowserDupes.includes(id) ? withoutBrowserDupes : [...withoutBrowserDupes, id];
+      });
+      for (const tabId of Object.keys(browserWb.browserSessions)) {
+        const sess = browserWb.browserSessions[tabId];
+        if (sess && normalizeMeetingJoinUrl(sess.url) === normalizeMeetingJoinUrl(url)) {
+          browserWb.closeBrowserTab(tabId);
+        }
+      }
+      setActiveTab(id);
+      if (isTauriDesktop()) {
+        void import('./browserWebview').then(({ focusBrowserWebview }) => focusBrowserWebview(id));
+      }
+    },
+    [meetingWb],
+  );
+
+  const openInObjectivBrowser = useCallback(
+    (url: string, tabTitle?: string) => {
+      const meetingUrl = normalizeMeetingJoinUrl(url);
+      if (meetingUrl) {
+        openMeetingInTab(meetingUrl, tabTitle?.trim() || meetingLinkLabel(meetingUrl));
+        return;
+      }
+      const id = browserWb.openBrowserTab(url);
+      if (tabTitle?.trim()) {
+        browserWb.patchSession(id, { title: tabTitle.trim() });
+      }
+      setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
+      setActiveTab(id);
+      setPanel('browser');
+      setSideBarVisible(true);
+    },
+    [browserWb, openMeetingInTab],
+  );
+
+  const openSlackWebInBrowser = useCallback(
+    (url: string, tabTitle?: string) => {
+      openInObjectivBrowser(url, tabTitle);
+    },
+    [openInObjectivBrowser],
+  );
+
+  const openSlackChatInEditor = useCallback(
+    (teamId: string, channelId: string, title: string, teamName: string, latestTs?: string) => {
+      slackChatWb.registerTeamName(teamId, teamName);
+      markSlackChannelSeen(channelId, latestTs);
+      const id = slackChatWb.openSlackChatTab(teamId, channelId, title);
+      setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
+      setActiveTab(id);
+      if (slackToken) {
+        void slackChatWb.loadHistoryForTab(slackToken, channelId, teamName, true);
+      }
+    },
+    [slackChatWb, slackToken],
+  );
+
+  const slackNotificationActions = useMemo((): SlackNotificationActions | undefined => {
+    if (!slackToken || settings.chatPlatform !== 'slack' || !isTauriDesktop()) return undefined;
+    return {
+      openConversation: (meta) => {
+        openSlackChatInEditor(
+          meta.teamId,
+          meta.channelId,
+          meta.channelTitle,
+          meta.teamName,
+          meta.messageTs,
+        );
+      },
+      sendReply: async (channelId, text) => {
+        await slackChatWb.sendMessageForTab(slackToken, channelId, { text, filePaths: [] });
+        markSlackChannelSeen(channelId);
+      },
+    };
+  }, [openSlackChatInEditor, settings.chatPlatform, slackChatWb, slackToken]);
+
+  useEffect(() => {
+    if (settings.chatPlatform !== 'slack' || !isTauriDesktop()) {
+      setSlackSocketConnected(false);
+      return;
+    }
+    const appToken = settings.slackAppToken.trim();
+    if (!appToken) {
+      void stopSlackSocket();
+      setSlackSocketConnected(false);
+      return;
+    }
+    let unlisten = () => {};
+    void startSlackSocket(appToken).catch(() => setSlackSocketConnected(false));
+    void listenSlackSocket(
+      (ev) => {
+        slackChatWb.applySocketEvent(ev, slackToken || undefined);
+      },
+      (st) => setSlackSocketConnected(st.connected),
+    ).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten();
+      void stopSlackSocket();
+      setSlackSocketConnected(false);
+    };
+  }, [settings.chatPlatform, settings.slackAppToken, slackToken, slackChatWb]);
+
+  useEffect(() => {
+    if (!slackToken || settings.chatPlatform !== 'slack' || !isTauriDesktop()) return;
+    let cancelled = false;
+    let first = true;
+    const poll = async () => {
+      try {
+        const snap = await fetchSlackWorkspace(slackToken);
+        if (cancelled) return;
+        ingestSlackWorkspaceForNotifications(
+          snap,
+          (n) => pushObjectivNotification(n),
+          first ? { baselineOnly: true } : undefined,
+        );
+        first = false;
+      } catch {
+        /* offline */
+      }
+    };
+    void poll();
+    const id = window.setInterval(() => void poll(), SLACK_WORKSPACE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [slackToken, settings.chatPlatform]);
+
+  useEffect(() => {
+    if (!slackToken || settings.chatPlatform !== 'slack' || !isTauriDesktop()) return;
+    if (!activeSlackChat?.channelId) return;
+    const channelId = activeSlackChat.channelId;
+    let cancelled = false;
+    let inflight = false;
+    const tick = async () => {
+      if (cancelled || inflight) return;
+      inflight = true;
+      try {
+        await slackChatWb.syncLatestForTab(slackToken, channelId);
+      } finally {
+        inflight = false;
+      }
+    };
+    void tick();
+    const pollMs = slackSocketConnected ? SLACK_CHANNEL_POLL_IDLE_MS : SLACK_CHANNEL_POLL_MS;
+    const id = window.setInterval(() => void tick(), pollMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    slackToken,
+    settings.chatPlatform,
+    activeSlackChat?.channelId,
+    slackChatWb,
+    slackSocketConnected,
+  ]);
+
+  const prefetchSlackHistories = useCallback(
+    (
+      teamId: string,
+      teamName: string,
+      conversations: { id: string; title: string; unread: number }[],
+    ) => {
+      if (!slackToken || settings.chatPlatform !== 'slack') return;
+      slackChatWb.registerTeamName(teamId, teamName);
+      const hot = conversations.filter((c) => c.unread > 0);
+      if (hot.length === 0) return;
+      const titles = Object.fromEntries(hot.map((c) => [c.id, c.title]));
+      void prefetchSlackHistoriesRef.current(
+        slackToken,
+        hot.map((c) => c.id),
+        teamId,
+        titles,
+        teamName,
+      );
+    },
+    [slackChatWb, slackToken, settings.chatPlatform],
+  );
+
+  useEffect(() => {
+    if (panel === 'messages') setSlackPanelMounted(true);
+  }, [panel]);
+
+  const openBrowserFixture = useCallback(
+    (fixture: BrowserFixtureId) => {
+      const id = ensureBrowserEditorTab();
+      browserWb.navigateBrowser(id, browserFixtureUrl(fixture));
+    },
+    [browserWb, ensureBrowserEditorTab],
+  );
 
   const toggleActiveBrowserDevtools = useCallback(() => {
     const id = activeBrowserSession?.id ?? ensureBrowserEditorTab();
@@ -2203,8 +2172,6 @@ export default function App() {
           closeFolder,
           quitApp: () => void quitApp(),
           showPanel: showWorkbenchPanel,
-          openSettingsCategory,
-          openLlmSuiteSettings: () => openSettingsCategory(SETTINGS_CATEGORY_LLM_SUITE),
           openCommandPalette: () => {
             setPaletteMode('commands');
             setPaletteOpen(true);
@@ -2218,7 +2185,6 @@ export default function App() {
           refreshExplorer: () => void refreshTree(),
           newFile: addFile,
           addFolderToWorkspace: () => void addFolderToWorkspace(),
-          startOpenVsCode: () => void startOpenVsCode(),
           toggleSplit,
           runWorkspaceTest,
           runWorkspaceBuild,
@@ -2251,13 +2217,12 @@ export default function App() {
           saveFile: saveActiveFile,
           saveAllFiles,
           toggleAutoSave,
-          openWorkspaceFromFile: () => void openWorkspaceFromFile(),
-          saveWorkspace: () => void saveWorkspace(),
-          saveWorkspaceAs: () => void saveWorkspaceAs(),
           openDiffFromPending: () => {
             if (agentPending) openDiffTab(agentPending);
           },
           toggleBrowserDevtools: toggleActiveBrowserDevtools,
+          openBrowserSeleniumFixture: () => openBrowserFixture('selenium'),
+          openBrowserHtmlPlayground: () => openBrowserFixture('html-playground'),
           reloadBrowserTab: reloadActiveBrowserTab,
         },
         { canOpenAgentDiff, workspaceOpen: hasWorkspaceOpen, browserTabActive },
@@ -2267,10 +2232,6 @@ export default function App() {
       openFilePicker,
       formatActiveDocument,
       addFolderToWorkspace,
-      openWorkspaceFromFile,
-      saveWorkspace,
-      saveWorkspaceAs,
-      startOpenVsCode,
       toggleSplit,
       runWorkspaceTest,
       runWorkspaceBuild,
@@ -2288,7 +2249,6 @@ export default function App() {
       canOpenAgentDiff,
       hasWorkspaceOpen,
       showWorkbenchPanel,
-      openSettingsCategory,
       zoomIn,
       zoomOut,
       zoomReset,
@@ -2300,6 +2260,7 @@ export default function App() {
       saveAllFiles,
       toggleAutoSave,
       toggleActiveBrowserDevtools,
+      openBrowserFixture,
       reloadActiveBrowserTab,
       browserTabActive,
     ],
@@ -2307,7 +2268,6 @@ export default function App() {
 
   useWorkbenchKeyboard({
     showPanel: showWorkbenchPanel,
-    openLlmSuiteSettings: () => openSettingsCategory(SETTINGS_CATEGORY_LLM_SUITE),
     openCommandPalette: () => {
       setPaletteMode('commands');
       setPaletteOpen(true);
@@ -2334,6 +2294,8 @@ export default function App() {
     saveFile: saveActiveFile,
     saveAllFiles,
     toggleBrowserDevtools: browserTabActive ? toggleActiveBrowserDevtools : undefined,
+    openBrowserSeleniumFixture: () => openBrowserFixture('selenium'),
+    openBrowserHtmlPlayground: () => openBrowserFixture('html-playground'),
     reloadBrowserTab: browserTabActive ? reloadActiveBrowserTab : undefined,
   });
 
@@ -2358,21 +2320,7 @@ export default function App() {
 
   const activeDiff = activeTab?.startsWith('diff:') ? diffTabs[activeTab] : null;
   const activeContent =
-    activeTab &&
-    !activeDiff &&
-    !activeBrowserSession &&
-    !isExtensionTab(activeTab) &&
-    !isDevCentraToolTab(activeTab)
-      ? files[activeTab] ?? ''
-      : '';
-
-  const openDevCentraTool = useCallback((slug: string, name: string) => {
-    const id = devcentraToolTabId(slug);
-    setDevcentraTabTitles((m) => (m[id] === name ? m : { ...m, [id]: name }));
-    setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
-    setActiveTab(id);
-    setPanel('devcentra');
-  }, []);
+    activeTab && !activeDiff && !activeBrowserSession ? files[activeTab] ?? '' : '';
   const setActiveContent = useCallback(
     (content: string) => {
       if (activeTab) setFileContent(activeTab, content);
@@ -2483,16 +2431,6 @@ export default function App() {
   };
 
   const handleTabSelect = (path: string) => {
-    if (isExtensionTab(path)) {
-      setActiveTab(path);
-      setPanel('extensions');
-      return;
-    }
-    if (isDevCentraToolTab(path)) {
-      setActiveTab(path);
-      setPanel('devcentra');
-      return;
-    }
     if (browserWb.isBrowserTab(path)) {
       setActiveTab(path);
       setPanel('browser');
@@ -2544,18 +2482,14 @@ export default function App() {
         }}
       />
       <AppMenuBar
-        hidden={isDesktop || !settings.menuBarVisible}
+        hidden={isTauriDesktop() || !settings.menuBarVisible}
         openFolder={() => void openFolder()}
         openFile={() => void openFilePicker()}
         addFolderToWorkspace={() => void addFolderToWorkspace()}
-        openWorkspaceFromFile={() => void openWorkspaceFromFile()}
-        saveWorkspace={() => void saveWorkspace()}
-        saveWorkspaceAs={() => void saveWorkspaceAs()}
         closeFolder={closeFolder}
         workspaceOpen={hasWorkspaceOpen}
         quitApp={() => void quitApp()}
         showPanel={showWorkbenchPanel}
-        openLlmSuiteSettings={() => openSettingsCategory(SETTINGS_CATEGORY_LLM_SUITE)}
         onSyncExport={exportSettings}
         onSyncImport={() => syncImportRef.current?.click()}
         zoomIn={zoomIn}
@@ -2577,12 +2511,7 @@ export default function App() {
           <Sidebar
             panel={panel}
             sideBarVisible={sideBarVisible}
-            auxiliaryBarVisible={settings.auxiliaryBarVisible}
-            extensionPanels={extensionActivityItems}
             setPanel={showWorkbenchPanel}
-            onToggleMessaging={() =>
-              patchSettings({ auxiliaryBarVisible: !settings.auxiliaryBarVisible })
-            }
             bottomPanelOpen={bottomPanelOpen}
             bottomPanelTab={bottomPanelTab}
             onBottomPanel={toggleBottomPanelTab}
@@ -2690,32 +2619,30 @@ export default function App() {
                 breakpoints={debugBreakpoints}
               />
             )}
-            {panel === 'extensions' && (
-              <ExtensionsPanel
-                workspaceRoot={activeRoot}
-                openVsCodeUrl={openVsCodeUrl}
-                openVsCodeBusy={openVsCodeBusy}
-                onStartOpenVsCode={() => void startOpenVsCode()}
-                onStopOpenVsCode={() => void stopOpenVsCode()}
-                onEmbedOpenVsCode={() => setEditorSurface('openvscode')}
-                patchSettings={patchSettings}
-                bench={extensionBench}
-                activeExtensionId={activeExtensionId}
-              />
+            {panel === 'extensions' && <ExtensionsPanel />}
+            {panel === 'llm' && <LlmSuitePanel />}
+            {slackPanelMounted && isChatIntegrationActive(settings) && (
+              <div
+                className={
+                  panel === 'messages' ? 'side-bar-panel-fill' : 'workbench-panel-hidden'
+                }
+              >
+                <MessagingPanel
+                  layout="sidebar"
+                  syncActive={panel === 'messages' && sideBarVisible}
+                  onOpenSlackChat={openSlackChatInEditor}
+                  historyPreview={slackChatWb.lastPreview}
+                  onPrefetchHistories={prefetchSlackHistories}
+                  onOpenSlackWeb={openSlackWebInBrowser}
+                />
+              </div>
             )}
-            {panel === 'remote-sftp' && (
-              <SftpExtensionPanel workspaceRoot={activeRoot} />
-            )}
-            {panel === 'devcentra' && (
-              <DevCentraExtensionPanel onOpenTool={openDevCentraTool} />
-            )}
+            {panel === 'meetings' && <MeetingsPanel onJoinMeeting={openMeetingInTab} />}
             {panel === 'browser' && (
               <BrowserPanel
                 sessions={browserWb.sessionList}
                 activeId={activeTab}
                 bookmarks={browserWb.bookmarks}
-                history={browserWb.history}
-                downloads={browserWb.downloads}
                 onOpenTab={(id) => {
                   setActiveTab(id);
                   setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
@@ -2725,9 +2652,6 @@ export default function App() {
                   setOpenTabs((t) => [...t, id]);
                   setActiveTab(id);
                 }}
-                onCloseTab={(id) => void requestCloseTab(id)}
-                onDuplicateTab={(id) => browserWb.duplicateBrowserTab(id)}
-                onCloseOtherTabs={(keepId) => browserWb.closeOtherBrowserTabs(keepId)}
                 onOpenBookmark={(url) => {
                   if (activeBrowserSession) browserWb.navigateBrowser(activeBrowserSession.id, url);
                   else {
@@ -2736,39 +2660,32 @@ export default function App() {
                     setActiveTab(id);
                   }
                 }}
-                onRemoveBookmark={(id) => browserWb.removeBookmark(id)}
-                onOpenHistory={(url) => {
-                  if (activeBrowserSession) browserWb.navigateBrowser(activeBrowserSession.id, url);
-                  else {
-                    const id = browserWb.openBrowserTab(url);
-                    setOpenTabs((t) => [...t, id]);
-                    setActiveTab(id);
-                  }
-                }}
-                onRemoveHistory={(id) => browserWb.removeHistoryItem(id)}
-                onClearHistory={() => browserWb.clearHistory()}
-                onRemoveDownload={(id) => browserWb.removeDownload(id)}
-                onClearDownloads={() => browserWb.clearDownloads()}
-                onOpenExternal={(url) => void openExternal(url)}
+                onRemoveBookmark={(id) =>
+                  browserWb.setBookmarks((b) => b.filter((x) => x.id !== id))
+                }
               />
             )}
             {panel === 'chat' && (
-              <ChatSidePanel
-                agentRef={agentChatRef}
-                files={files}
-                openTabs={openTabs.filter((t) => !browserWb.isBrowserTab(t))}
-                sidecarUrl={sidecarUrl}
-                pilotUser={settings.pilotUser}
-                sessionId={agentSessionId}
-                workspaceLabel={activeRoot ? activeRoot.split(/[/\\]/).pop() ?? activeRoot : null}
-                eventsDir={sidecarMeta?.eventsDir ?? null}
-                onRunId={setAgentRunId}
-                onApplyActions={applyActions}
-                onSidecarApplied={() => void refreshTree()}
-                onPendingChange={setAgentPending}
-                onOpenDiff={openDiffTab}
-                onOpenLlmSettings={() => openSettingsCategory(SETTINGS_CATEGORY_LLM_SUITE)}
-              />
+              <>
+                <div className="side-bar-title">AGENT</div>
+                <div className="side-bar-panel-fill">
+                  <AgentChatPanel
+                    ref={agentChatRef}
+                    files={files}
+                    openTabs={openTabs.filter((t) => !browserWb.isBrowserTab(t))}
+                    sidecarUrl={sidecarUrl}
+                    pilotUser={settings.pilotUser}
+                    sessionId={agentSessionId}
+                    workspaceLabel={activeRoot ? activeRoot.split(/[/\\]/).pop() ?? activeRoot : null}
+                    eventsDir={sidecarMeta?.eventsDir ?? null}
+                    onRunId={setAgentRunId}
+                    onApplyActions={applyActions}
+                    onSidecarApplied={() => void refreshTree()}
+                    onPendingChange={setAgentPending}
+                    onOpenDiff={openDiffTab}
+                  />
+                </div>
+              </>
             )}
             {ACTIVITY_BAR_ITEMS.some((i) => i.id === panel && i.placeholder) && (
               <PlaceholderPanel panel={panel} gitLines={gitLines} />
@@ -2778,67 +2695,140 @@ export default function App() {
           }
         >
         <AuxiliaryBarSplit
-          enabled={settings.auxiliaryBarVisible}
+          enabled={false}
           widthPx={settings.auxiliaryBarWidthPx}
           onWidthChange={(px) => patchSettings({ auxiliaryBarWidthPx: px })}
-          auxiliary={
-            <div className="side-bar auxiliary-side-bar">
-              <MessagingPanel />
-            </div>
-          }
+          auxiliary={null}
         >
         <div
           className={`workbench-center ${bottomPanelMaximized && bottomPanelOpen ? 'panel-maximized' : ''} ${settings.centeredLayout ? 'centered-layout' : ''}`}
         >
         <div className="editor-area">
           {panel === 'settings' ? (
-            <SettingsPanel
-              focusCategory={settingsFocusCategory}
-              onClose={() => setPanel('explorer')}
-            />
+            <>
+              <div className="tabs-container">
+                <div className="tabs-scroll" aria-hidden />
+                <div className="tabs-actions">
+                  <NotificationHost inline slackActions={slackNotificationActions} />
+                  {integrationToolbar.map((action) => (
+                    <button
+                      key={action.panel}
+                      type="button"
+                      className={`tab-action-btn ${action.active ? 'active' : ''}`}
+                      title={action.title}
+                      aria-label={action.title}
+                      aria-pressed={action.active}
+                      onClick={action.onClick}
+                    >
+                      <IntegrationBrandIcon brand={action.brand} size={18} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <SettingsPanel onClose={() => setPanel('explorer')} />
+            </>
           ) : (
             <>
-          {editorSurface === 'objectiv' && (
-            <TabBar
-              openTabs={openTabs}
-              activeTab={editorFocus === 'secondary' && splitTab ? splitTab : activeTab}
-              dirtyPaths={dirtyPaths}
-              tabLabel={(path) => {
-                if (isExtensionTab(path)) {
-                  const sel = extensionBench.selectionForActiveTab(path);
-                  if (sel) {
-                    return sel.source === 'installed' ? sel.ext.name : sel.entry.name;
-                  }
-                  return extensionIdFromTab(path);
-                }
-                if (isDevCentraToolTab(path)) {
-                  return devcentraTabTitles[path] ?? devcentraSlugFromTab(path);
-                }
-                return browserWb.isBrowserTab(path)
-                  ? browserWb.tabTitle(path)
-                  : path.split(/[/\\]/).pop() ?? path;
-              }}
-              onSelect={handleTabSelect}
-              onClose={(path) => void requestCloseTab(path)}
-              onReorder={reorderTabs}
-              onSplit={toggleSplit}
-              splitActive={splitEnabled}
-            />
-          )}
+          <TabBar
+            openTabs={openTabs}
+            activeTab={editorFocus === 'secondary' && splitTab ? splitTab : activeTab}
+            dirtyPaths={dirtyPaths}
+            tabLabel={(path) =>
+              browserWb.isBrowserTab(path)
+                ? browserWb.tabTitle(path)
+                : isSlackChatTab(path)
+                  ? slackChatTabTitle(slackChatWb.sessionForTab(path), path)
+                  : isMeetingTab(path)
+                    ? meetingTabTitle(meetingWb.sessionForTab(path), path)
+                    : path.split(/[/\\]/).pop() ?? path
+            }
+            onSelect={handleTabSelect}
+            onClose={(path) => void requestCloseTab(path)}
+            onReorder={reorderTabs}
+            onSplit={toggleSplit}
+            splitActive={splitEnabled}
+            integrationToolbar={integrationToolbar}
+            toolbarStart={<NotificationHost inline slackActions={slackNotificationActions} />}
+          />
           <div className="editor-wrap">
-            {editorSurface === 'openvscode' && openVsCodeUrl ? (
-              <OpenVsCodeFrame
-                url={openVsCodeUrl}
-                onBack={() => setEditorSurface('objectiv')}
+            {activeMeeting ? (
+              <MeetingTabView
+                session={activeMeeting}
+                onReload={() => meetingWb.reloadTab(activeMeeting.tabId)}
+              />
+            ) : activeSlackChat ? (
+              <SlackChatView
+                session={activeSlackChat}
+                onLoadOlder={
+                  activeSlackChat.nextCursor && slackToken
+                    ? () =>
+                        void slackChatWb.loadOlderForTab(
+                          slackToken,
+                          activeSlackChat.channelId,
+                          activeSlackChat.nextCursor!,
+                        )
+                    : undefined
+                }
+                onOpenSlackWeb={() =>
+                  openSlackWebInBrowser(
+                    slackWebClientUrl(activeSlackChat.teamId, activeSlackChat.channelId),
+                    activeSlackChat.title,
+                  )
+                }
+                onRefresh={
+                  slackToken
+                    ? () =>
+                        void slackChatWb.loadHistoryForTab(
+                          slackToken,
+                          activeSlackChat.channelId,
+                          activeSlackChat.title,
+                          true,
+                        )
+                    : undefined
+                }
+                slackToken={slackToken || undefined}
+                onSend={
+                  slackToken
+                    ? (payload) =>
+                        slackChatWb.sendMessageForTab(
+                          slackToken,
+                          activeSlackChat.channelId,
+                          payload,
+                        )
+                    : undefined
+                }
+                onEditMessage={
+                  slackToken
+                    ? (messageTs, text) =>
+                        slackChatWb.editMessageForTab(
+                          slackToken,
+                          activeSlackChat.channelId,
+                          messageTs,
+                          text,
+                        )
+                    : undefined
+                }
+                onToggleReaction={
+                  slackToken
+                    ? (messageTs, name, remove) =>
+                        slackChatWb.toggleReactionForTab(
+                          slackToken,
+                          activeSlackChat.channelId,
+                          messageTs,
+                          name,
+                          remove,
+                        )
+                    : undefined
+                }
+                onJoinMeeting={openMeetingInTab}
+                onOpenInBrowser={openSlackWebInBrowser}
               />
             ) : activeBrowserSession ? (
               <BrowserView
                 key={activeBrowserSession.id}
                 session={activeBrowserSession}
-                webviewActive={editorSurface === 'objectiv'}
+                webviewActive
                 bookmarked={browserWb.bookmarks.some((b) => b.url === activeBrowserSession.url)}
-                bookmarks={browserWb.bookmarks}
-                recentHistory={browserWb.history.map((h) => ({ url: h.url, title: h.title }))}
                 onNavigate={(url) => browserWb.navigateBrowser(activeBrowserSession.id, url)}
                 onInputChange={(value) => browserWb.patchSession(activeBrowserSession.id, { input: value })}
                 onBack={() => browserWb.goHistory(activeBrowserSession.id, -1)}
@@ -2846,25 +2836,14 @@ export default function App() {
                 onReload={() =>
                   browserWb.patchSession(activeBrowserSession.id, {
                     reloadToken: activeBrowserSession.reloadToken + 1,
-                    loading: true,
                   })
                 }
-                onStop={() => browserWb.stopLoading(activeBrowserSession.id)}
-                onHome={() => browserWb.goHome(activeBrowserSession.id)}
-                onPageLoaded={(title) => browserWb.markPageLoaded(activeBrowserSession.id, title)}
-                onZoom={(delta) =>
-                  browserWb.setSessionZoom(activeBrowserSession.id, activeBrowserSession.zoom + delta)
-                }
-                onZoomReset={() => browserWb.setSessionZoom(activeBrowserSession.id, 1)}
-                onCopyUrl={() => {
-                  void navigator.clipboard?.writeText(activeBrowserSession.url);
-                }}
-                onOpenExternal={() => void openExternal(activeBrowserSession.url)}
-                onClearSiteData={() => browserWb.clearAllBrowserData()}
                 onToggleBookmark={() =>
                   browserWb.toggleBookmark(activeBrowserSession.url, activeBrowserSession.title)
                 }
                 onToggleDevtools={toggleActiveBrowserDevtools}
+                onOpenFixture={(id) => openBrowserFixture(id)}
+                onOpenExtensions={() => setPanel('extensions')}
               />
             ) : activeTab && activeDiff ? (
               <DiffEditorPane
@@ -2875,51 +2854,6 @@ export default function App() {
                 fontSize={settings.fontSize}
                 theme={editorTheme}
               />
-            ) : activeTab && isDevCentraToolTab(activeTab) ? (
-              <div className="extension-detail-editor-scroll">
-                <DevCentraToolPane slug={devcentraSlugFromTab(activeTab)} />
-              </div>
-            ) : activeExtensionSelection ? (
-              <div className="extension-detail-editor-scroll">
-                <ExtensionDetail
-                  layout="editor"
-                  selection={activeExtensionSelection}
-                  busy={Boolean(extensionBench.busyId)}
-                  onInstall={() => {
-                    if (activeExtensionSelection.source === 'marketplace') {
-                      extensionBench.installCatalogEntry(activeExtensionSelection.entry);
-                    }
-                  }}
-                  onSetEnabled={(on) => {
-                    const ext =
-                      activeExtensionSelection.source === 'installed'
-                        ? activeExtensionSelection.ext
-                        : activeExtensionSelection.installed;
-                    if (ext) extensionBench.setExtensionEnabledState(ext, on);
-                  }}
-                  onEnable={() => {
-                    const ext =
-                      activeExtensionSelection.source === 'installed'
-                        ? activeExtensionSelection.ext
-                        : activeExtensionSelection.installed;
-                    if (ext) extensionBench.enableExtension(ext);
-                  }}
-                  onDisable={() => {
-                    const ext =
-                      activeExtensionSelection.source === 'installed'
-                        ? activeExtensionSelection.ext
-                        : activeExtensionSelection.installed;
-                    if (ext) extensionBench.disableExtension(ext);
-                  }}
-                  onUninstall={() => {
-                    const ext =
-                      activeExtensionSelection.source === 'installed'
-                        ? activeExtensionSelection.ext
-                        : activeExtensionSelection.installed;
-                    if (ext) extensionBench.removeExtension(ext);
-                  }}
-                />
-              </div>
             ) : activeTab ? (
               <SplitEditorArea
                 split={splitEnabled && Boolean(splitTab ?? activeTab)}
@@ -3024,7 +2958,6 @@ export default function App() {
             )}
           </button>
         )}
-        {openVsCodeUrl && <span className="segment">OpenVSCode</span>}
         {sidecarUrl && <span className="segment">Objective · sidecar</span>}
         <div className="status-bar-spacer" />
         <button
@@ -3115,7 +3048,6 @@ export default function App() {
           onOpenDiff={() => openDiffTab(agentPending)}
         />
       )}
-      <NotificationHost />
       {trustPrompt && (
         <TrustDialog
           folderPath={trustPrompt}
@@ -3129,11 +3061,6 @@ export default function App() {
             }
             const root = trustPrompt;
             setTrustPrompt(null);
-            const pending = pendingWorkspaceRestoreRef.current;
-            if (pending) {
-              void finishOpenWorkspaceFromFile(pending.parsed, pending.definitionPath);
-              return;
-            }
             void commitFolderPick(root);
           }}
         />

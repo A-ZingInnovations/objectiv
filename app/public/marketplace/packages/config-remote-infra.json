@@ -1,0 +1,20 @@
+{
+  "manifest": {
+    "id": "objectiv.config.remote-infra",
+    "name": "Remote / infra editing",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Settings for SSH config, Helm, and Terraform-style files in Objectiv.",
+    "kind": "config",
+    "contributes": {
+      "editor": {
+        "tabSize": 2,
+        "insertSpaces": true,
+        "formatOnSave": true,
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true,
+        "wordWrap": "off"
+      }
+    }
+  }
+}

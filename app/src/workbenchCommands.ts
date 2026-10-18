@@ -22,11 +22,7 @@ export type WorkbenchActions = {
   newFile: () => void;
   openDiffFromPending: () => void;
   addFolderToWorkspace: () => void;
-  openWorkspaceFromFile: () => void;
-  saveWorkspace: () => void;
-  saveWorkspaceAs: () => void;
   openQuickOpen: () => void;
-  startOpenVsCode: () => void;
   toggleSplit: () => void;
   runWorkspaceTest: () => void;
   runWorkspaceBuild: () => void;
@@ -53,9 +49,9 @@ export type WorkbenchActions = {
   saveAllFiles: () => void;
   toggleAutoSave: () => void;
   toggleBrowserDevtools?: () => void;
+  openBrowserSeleniumFixture?: () => void;
+  openBrowserHtmlPlayground?: () => void;
   reloadBrowserTab?: () => void;
-  openSettingsCategory?: (category: string) => void;
-  openLlmSuiteSettings?: () => void;
 };
 
 const PANEL_SHORTCUTS: Partial<Record<ActivityPanel, string>> = {
@@ -68,6 +64,7 @@ const PANEL_SHORTCUTS: Partial<Record<ActivityPanel, string>> = {
   chat: '⌘⇧A',
   browser: '⌘⇧B',
   messages: '⌘⇧I',
+  llm: '⌘⇧L',
   terminal: '⌃`',
   settings: '⌘,',
 };
@@ -86,21 +83,26 @@ export function buildWorkbenchCommands(
 
   return [
     {
-      id: 'settings.llmSuite',
-      title: 'Open LLM Suite Settings',
-      category: 'View',
-      keybinding: '⌘⇧L',
-      run: () =>
-        actions.openLlmSuiteSettings?.() ??
-        actions.openSettingsCategory?.('LLM Suite'),
-    },
-    {
       id: 'browser.devtools',
       title: 'Toggle Browser Developer Tools',
       category: 'Browser',
       keybinding: '⌘⌥I',
       when: () => opts?.browserTabActive ?? false,
       run: () => actions.toggleBrowserDevtools?.(),
+    },
+    {
+      id: 'browser.seleniumFixture',
+      title: 'Open Selenium / WebDriver Test Page',
+      category: 'Browser',
+      keybinding: '⌘⇧T',
+      run: () => actions.openBrowserSeleniumFixture?.(),
+    },
+    {
+      id: 'browser.htmlPlayground',
+      title: 'Open HTML Playground',
+      category: 'Browser',
+      keybinding: '⌘⇧H',
+      run: () => actions.openBrowserHtmlPlayground?.(),
     },
     {
       id: 'browser.reload',
@@ -157,32 +159,6 @@ export function buildWorkbenchCommands(
       title: 'Add Folder to Workspace…',
       category: 'File',
       run: actions.addFolderToWorkspace,
-    },
-    {
-      id: 'file.openWorkspace',
-      title: 'Open Workspace from File…',
-      category: 'File',
-      run: actions.openWorkspaceFromFile,
-    },
-    {
-      id: 'file.saveWorkspace',
-      title: 'Save Workspace',
-      category: 'File',
-      when: () => opts?.workspaceOpen ?? false,
-      run: actions.saveWorkspace,
-    },
-    {
-      id: 'file.saveWorkspaceAs',
-      title: 'Save Workspace As…',
-      category: 'File',
-      when: () => opts?.workspaceOpen ?? false,
-      run: actions.saveWorkspaceAs,
-    },
-    {
-      id: 'extensions.openVsCode',
-      title: 'Start OpenVSCode Server',
-      category: 'Extensions',
-      run: actions.startOpenVsCode,
     },
     {
       id: 'editor.split',
@@ -387,6 +363,8 @@ function panelTitle(panel: ActivityPanel): string {
       return 'Extensions';
     case 'chat':
       return 'Objective Agent';
+    case 'llm':
+      return 'LLM Suite';
     case 'terminal':
       return 'Terminal';
     case 'problems':

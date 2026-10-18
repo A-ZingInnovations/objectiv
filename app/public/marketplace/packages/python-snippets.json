@@ -1,0 +1,27 @@
+{
+  "manifest": {
+    "id": "azing.snippets.python-starter",
+    "name": "Python Starter Snippets",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Common Python scaffolding snippets.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "main guard",
+          "language": "python",
+          "body": "if __name__ == \"__main__\":\n    main()\n"
+        },
+        {
+          "name": "pytest test",
+          "language": "python",
+          "body": "def test_example():\n    assert True\n"
+        }
+      ]
+    }
+  },
+  "files": {
+    "snippets.json": "{\n  \"source\": \"objectiv-marketplace\"\n}\n"
+  }
+}

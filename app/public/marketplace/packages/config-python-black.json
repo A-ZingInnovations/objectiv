@@ -1,0 +1,19 @@
+{
+  "manifest": {
+    "id": "objectiv.config.python-black",
+    "name": "Python / Black defaults",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "4-space indents and format-on-save for Python-style projects.",
+    "kind": "config",
+    "contributes": {
+      "editor": {
+        "tabSize": 4,
+        "insertSpaces": true,
+        "formatOnSave": true,
+        "trimTrailingWhitespace": true,
+        "insertFinalNewline": true
+      }
+    }
+  }
+}

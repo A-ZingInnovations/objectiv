@@ -18,7 +18,6 @@ const MAX_FILES: usize = 2000;
 const MAX_SCAN_BYTES: u64 = 25_000_000;
 const MAX_TEXT_BYTES: u64 = 2_000_000;
 const MAX_BINARY_BYTES: u64 = 25_000_000;
-const MAX_ABS_TEXT_BYTES: u64 = 4_000_000;
 
 fn safe_rel(root: &Path, rel: &str) -> Result<PathBuf, String> {
     let rel = rel.trim_start_matches('/');
@@ -1194,45 +1193,4 @@ pub fn user_home() -> Result<String, String> {
 #[tauri::command]
 pub fn path_is_dir(path: String) -> bool {
     PathBuf::from(path).is_dir()
-}
-
-/// Read a user-selected file (workspace definition, etc.) outside workspace roots.
-#[tauri::command]
-pub fn read_text_file(path: String) -> Result<String, String> {
-    let p = PathBuf::from(path.trim());
-    let meta = std::fs::metadata(&p).map_err(|e| e.to_string())?;
-    if !meta.is_file() {
-        return Err("not a file".into());
-    }
-    if meta.len() > MAX_ABS_TEXT_BYTES {
-        return Err("file too large".into());
-    }
-    std::fs::read_to_string(&p).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn write_text_file(path: String, content: String) -> Result<(), String> {
-    let p = PathBuf::from(path.trim());
-    if let Some(parent) = p.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-    }
-    std::fs::write(&p, content.as_bytes()).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn write_file_bytes(path: String, content_base64: String) -> Result<(), String> {
-    let p = PathBuf::from(path.trim());
-    if let Some(parent) = p.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-    }
-    let bytes = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        content_base64.trim(),
-    )
-    .map_err(|e| e.to_string())?;
-    std::fs::write(&p, bytes).map_err(|e| e.to_string())
 }

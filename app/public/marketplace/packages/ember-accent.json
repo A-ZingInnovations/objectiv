@@ -1,0 +1,13 @@
+{
+  "manifest": {
+    "id": "azing.theme.objectiv-ember-accent",
+    "name": "Ember Accent",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Warm ember accent on your current theme.",
+    "kind": "theme",
+    "contributes": {
+      "accentColor": "#fb923c"
+    }
+  }
+}

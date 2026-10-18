@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "azing.snippets.typescript-react",
+    "name": "TypeScript & React",
+    "publisher": "A-Zing Innovations",
+    "version": "1.0.0",
+    "description": "Hooks, components, and fetch helpers for TS/TSX.",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "react functional component",
+          "language": "typescript",
+          "body": "type ${1:Name}Props = {\n  ${2:// props}\n};\n\nexport function ${1:Name}({ ${3:} }: ${1:Name}Props) {\n  return (\n    <div>${4}</div>\n  );\n}\n"
+        },
+        {
+          "name": "useEffect",
+          "language": "typescript",
+          "body": "useEffect(() => {\n  ${1}\n  return () => {\n    ${2}\n  };\n}, [${3}]);\n"
+        },
+        {
+          "name": "typed fetch json",
+          "language": "typescript",
+          "body": "const res = await fetch('${1:url}');\nif (!res.ok) throw new Error(res.statusText);\nconst data = (await res.json()) as ${2:unknown};\n"
+        }
+      ]
+    }
+  }
+}

@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import FileTree from './FileTree';
 import SideBarSection from './SideBarSection';
+import ExplorerWelcome from './ExplorerWelcome';
 import FileTypeIcon from './FileTypeIcon';
 import { displayPath } from '../workspaceDisk';
-import type { ComponentProps, ReactNode } from 'react';
+import { workspaceFolderLabel } from '../desktopWorkspace';
+import type { ComponentProps } from 'react';
 
 type FileTreeProps = ComponentProps<typeof FileTree>;
 
@@ -14,6 +16,8 @@ type Props = FileTreeProps & {
   onCloseEditor: (path: string) => void;
   browserSection?: ReactNode;
 };
+
+type SectionId = 'editors' | 'workspace' | 'browser' | 'outline' | 'timeline';
 
 function editorLabel(path: string): string {
   const rel = displayPath(path);
@@ -27,29 +31,61 @@ export default function ExplorerSidePanel({
   onActivateEditor,
   onCloseEditor,
   browserSection,
+  workspaceRoots,
+  activeRootIndex,
   ...fileTreeProps
 }: Props) {
-  const [editorsOpen, setEditorsOpen] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [browserOpen, setBrowserOpen] = useState(false);
+  const hasWorkspace = workspaceRoots.length > 0;
+  const workspaceTitle = hasWorkspace
+    ? workspaceFolderLabel(workspaceRoots[activeRootIndex] ?? workspaceRoots[0] ?? '')
+    : 'No Folder Opened';
 
   const editors = useMemo(
     () => openEditorPaths.filter((p) => !p.startsWith('browser:')),
     [openEditorPaths],
   );
 
-  return (
-    <div className="explorer-side-panel">
-      <div className="side-bar-title explorer-composite-title">
-        <span>EXPLORER</span>
-      </div>
-      <SideBarSection
-        title="Open Editors"
-        count={editors.length}
-        open={editorsOpen}
-        onToggle={() => setEditorsOpen((v) => !v)}
-      >
-        {editors.length === 0 ? (
+  const [editorsOpen, setEditorsOpen] = useState(() => editors.length > 0);
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
+
+  useEffect(() => {
+    if (editors.length > 0) setEditorsOpen(true);
+  }, [editors.length]);
+
+  const sectionOpen: Record<SectionId, boolean> = {
+    editors: editorsOpen,
+    workspace: workspaceOpen,
+    browser: browserOpen,
+    outline: outlineOpen,
+    timeline: timelineOpen,
+  };
+
+  const sectionOrder: SectionId[] = useMemo(() => {
+    const order: SectionId[] = ['editors', 'workspace'];
+    if (browserSection) order.push('browser');
+    order.push('outline', 'timeline');
+    return order;
+  }, [browserSection]);
+
+  const fillId: SectionId | null = workspaceOpen
+    ? 'workspace'
+    : browserSection && browserOpen
+      ? 'browser'
+      : outlineOpen
+        ? 'outline'
+        : timelineOpen
+          ? 'timeline'
+          : editorsOpen
+            ? 'editors'
+            : null;
+
+  function renderSectionBody(id: SectionId): ReactNode {
+    switch (id) {
+      case 'editors':
+        return editors.length === 0 ? (
           <p className="sidebar-section-empty">No open editors</p>
         ) : (
           <ul className="sidebar-section-list">
@@ -76,28 +112,106 @@ export default function ExplorerSidePanel({
               </li>
             ))}
           </ul>
-        )}
-      </SideBarSection>
+        );
+      case 'workspace':
+        return hasWorkspace ? (
+          <FileTree
+            {...fileTreeProps}
+            workspaceRoots={workspaceRoots}
+            activeRootIndex={activeRootIndex}
+            embedded
+            hideEmptyWelcome
+          />
+        ) : (
+          <ExplorerWelcome
+            layout="plain"
+            onOpenFolder={fileTreeProps.onOpenFolder}
+            onCloneRepository={fileTreeProps.onCloneRepository}
+            diskMode={fileTreeProps.diskMode}
+          />
+        );
+      case 'browser':
+        return browserSection;
+      case 'outline':
+        return (
+          <p className="sidebar-section-empty">
+            The active editor cannot provide outline information.
+          </p>
+        );
+      case 'timeline':
+        return <p className="sidebar-section-empty">No timeline events</p>;
+      default:
+        return null;
+    }
+  }
 
-      <SideBarSection
-        title="Workspace"
-        open={workspaceOpen}
-        onToggle={() => setWorkspaceOpen((v) => !v)}
-        className="explorer-workspace-section"
-      >
-        <FileTree {...fileTreeProps} embedded />
-      </SideBarSection>
+  function sectionTitle(id: SectionId): string {
+    if (id === 'workspace') {
+      return hasWorkspace ? workspaceTitle.toUpperCase() : 'No Folder Opened';
+    }
+    if (id === 'editors') return 'Open Editors';
+    if (id === 'browser') return 'Browser';
+    if (id === 'outline') return 'Outline';
+    return 'Timeline';
+  }
 
-      {browserSection && (
-        <SideBarSection
-          title="Browser"
-          open={browserOpen}
-          onToggle={() => setBrowserOpen((v) => !v)}
-          className="explorer-browser-section"
-        >
-          {browserSection}
-        </SideBarSection>
-      )}
+  function sectionClass(id: SectionId): string {
+    if (id === 'workspace') return 'explorer-workspace-section';
+    if (id === 'browser') return 'explorer-browser-section';
+    if (id === 'outline') return 'explorer-outline-section';
+    if (id === 'timeline') return 'explorer-timeline-section';
+    return '';
+  }
+
+  function toggleSection(id: SectionId) {
+    if (id === 'editors') setEditorsOpen((v) => !v);
+    else if (id === 'workspace') setWorkspaceOpen((v) => !v);
+    else if (id === 'browser') setBrowserOpen((v) => !v);
+    else if (id === 'outline') setOutlineOpen((v) => !v);
+    else setTimelineOpen((v) => !v);
+  }
+
+  return (
+    <div className="explorer-side-panel">
+      <div className="side-bar-title explorer-composite-title">
+        <span>EXPLORER</span>
+      </div>
+
+      <div className="explorer-sections-grow">
+        {sectionOrder
+          .filter((id) => sectionOpen[id])
+          .map((id) => (
+            <SideBarSection
+              key={id}
+              title={sectionTitle(id)}
+              count={id === 'editors' ? editors.length : undefined}
+              open
+              onToggle={() => toggleSection(id)}
+              className={sectionClass(id)}
+              fill={fillId === id}
+            >
+              {renderSectionBody(id)}
+            </SideBarSection>
+          ))}
+      </div>
+
+      <div className="explorer-sections-bottom">
+        {sectionOrder
+          .filter((id) => !sectionOpen[id])
+          .map((id) => (
+            <SideBarSection
+              key={id}
+              title={sectionTitle(id)}
+              count={id === 'editors' ? editors.length : undefined}
+              open={false}
+              headerOnly
+              onToggle={() => toggleSection(id)}
+              className={sectionClass(id)}
+            >
+              {null}
+            </SideBarSection>
+          ))}
+      </div>
     </div>
   );
 }

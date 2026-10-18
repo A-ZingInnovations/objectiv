@@ -1,0 +1,29 @@
+{
+  "manifest": {
+    "id": "objectiv.snippets.sftp-deploy",
+    "name": "SFTP & rsync Deploy",
+    "publisher": "Objectiv Marketplace",
+    "version": "1.0.0",
+    "description": "Sync and SFTP one-liners for remote uploads (companion to Objectiv terminal).",
+    "kind": "snippets",
+    "contributes": {
+      "snippets": [
+        {
+          "name": "rsync deploy",
+          "language": "shell",
+          "body": "rsync -avz --delete \\\n  -e 'ssh -i ${1:~/.ssh/id_ed25519}' \\\n  ${2:./dist/} ${3:user}@${4:host}:${5:/var/www/app/}\n"
+        },
+        {
+          "name": "sftp batch",
+          "language": "shell",
+          "body": "sftp -b - ${1:user}@${2:host} <<'EOF'\ncd ${3:/remote/path}\nput -r ${4:local/dir}\nEOF\n"
+        },
+        {
+          "name": "scp recursive",
+          "language": "shell",
+          "body": "scp -r ${1:./artifact} ${2:user}@${3:host}:${4:/tmp/}\n"
+        }
+      ]
+    }
+  }
+}

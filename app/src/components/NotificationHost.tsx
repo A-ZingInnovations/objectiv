@@ -5,9 +5,10 @@ import {
   kindCodicon,
   kindLabel,
   notificationAllowed,
-  sampleNotifications,
+  OBJECTIV_PUSH_NOTIFICATION,
   type ObjectivNotification,
   type NotificationKind,
+  type SlackNotificationMeta,
 } from '../notifications';
 
 const STORAGE_KEY = 'objectiv-notifications-v1';
@@ -18,11 +19,11 @@ type Toast = { id: string; notificationId: string };
 function loadStored(): ObjectivNotification[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return sampleNotifications();
+    if (!raw) return [];
     const parsed = JSON.parse(raw) as ObjectivNotification[];
-    return Array.isArray(parsed) && parsed.length ? parsed : sampleNotifications();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return sampleNotifications();
+    return [];
   }
 }
 
@@ -35,7 +36,17 @@ type ReplyTarget = {
   source: 'toast' | 'panel';
 };
 
-export default function NotificationHost() {
+export type SlackNotificationActions = {
+  openConversation: (meta: SlackNotificationMeta) => void;
+  sendReply: (channelId: string, text: string) => Promise<void>;
+};
+
+type Props = {
+  inline?: boolean;
+  slackActions?: SlackNotificationActions;
+};
+
+export default function NotificationHost({ inline = false, slackActions }: Props) {
   const { settings } = useObjectivSettings();
   const prefs = useMemo(
     () => ({
@@ -58,7 +69,6 @@ export default function NotificationHost() {
   const [replyText, setReplyText] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
   const [replySentHint, setReplySentHint] = useState<string | null>(null);
-  const seededDemo = useRef(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const visibleItems = useMemo(
@@ -114,24 +124,30 @@ export default function NotificationHost() {
     [prefs],
   );
 
-  // One gentle demo toast on first mount when toasts are on
   useEffect(() => {
-    if (seededDemo.current) return;
-    seededDemo.current = true;
-    const first = visibleItems.find((n) => !n.read);
-    if (first && prefs.notifyToastsEnabled) {
-      const t = window.setTimeout(() => pushToast(first), 1200);
-      return () => window.clearTimeout(t);
-    }
-  }, [prefs.notifyToastsEnabled, pushToast, visibleItems]);
+    const onPush = (e: Event) => {
+      const ce = e as CustomEvent<ObjectivNotification>;
+      const n = ce.detail;
+      if (!n?.id) return;
+      updateItems((prev) => {
+        if (prev.some((p) => p.id === n.id)) return prev;
+        return [n, ...prev];
+      });
+      pushToast(n);
+    };
+    window.addEventListener(OBJECTIV_PUSH_NOTIFICATION, onPush);
+    return () => window.removeEventListener(OBJECTIV_PUSH_NOTIFICATION, onPush);
+  }, [pushToast, updateItems]);
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setPanelOpen(false);
-    }
+    const onDoc = (e: MouseEvent) => {
+      if (!panelOpen) return;
+      const el = wrapRef.current;
+      if (el && !el.contains(e.target as Node)) setPanelOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
+  }, [panelOpen]);
 
   function markRead(id: string) {
     updateItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
@@ -155,32 +171,43 @@ export default function NotificationHost() {
     setPanelOpen(false);
   }
 
+  function openSlackNotification(n: ObjectivNotification) {
+    if (!n.slack || !slackActions) return;
+    markRead(n.id);
+    slackActions.openConversation(n.slack);
+    setPanelOpen(false);
+  }
+
   async function submitReply() {
     if (!reply || !replyText.trim()) return;
     setReplyBusy(true);
     const n = reply.notification;
-    // Stub outbox — same path as agent on-behalf drafts until live connectors land
     try {
-      const draft = {
-        id: `reply_${Date.now()}`,
-        channel: n.kind === 'mail' ? 'mail' : n.platform.toLowerCase().replace(/\s+/g, '_'),
-        to: n.from,
-        subject: n.kind === 'mail' ? `Re: ${n.title}` : '',
-        body: replyText.trim(),
-        threadId: n.threadId,
-        created_at: new Date().toISOString(),
-        source: 'notification_reply',
-      };
-      localStorage.setItem(
-        `objectiv-outbox-${draft.id}`,
-        JSON.stringify(draft),
-      );
-      setReplySentHint(`Reply queued to ${n.from} via ${n.platform}`);
+      if (n.slack && slackActions) {
+        await slackActions.sendReply(n.slack.channelId, replyText.trim());
+        setReplySentHint(`Sent in ${n.slack.channelTitle}`);
+      } else {
+        const draft = {
+          id: `reply_${Date.now()}`,
+          channel: n.kind === 'mail' ? 'mail' : n.platform.toLowerCase().replace(/\s+/g, '_'),
+          to: n.from,
+          subject: n.kind === 'mail' ? `Re: ${n.title}` : '',
+          body: replyText.trim(),
+          threadId: n.threadId,
+          created_at: new Date().toISOString(),
+          source: 'notification_reply',
+        };
+        localStorage.setItem(`objectiv-outbox-${draft.id}`, JSON.stringify(draft));
+        setReplySentHint(`Reply queued to ${n.from} via ${n.platform}`);
+      }
+      markRead(n.id);
       setReplyText('');
       window.setTimeout(() => {
         setReply(null);
         setReplySentHint(null);
       }, 1400);
+    } catch (e) {
+      setReplySentHint(e instanceof Error ? e.message : String(e));
     } finally {
       setReplyBusy(false);
     }
@@ -190,7 +217,7 @@ export default function NotificationHost() {
     const platform =
       kind === 'chat'
         ? settings.chatPlatform === 'none'
-          ? 'Teams'
+          ? 'Slack'
           : settings.chatPlatform.replace('_', ' ')
         : kind === 'mail'
           ? 'IMAP'
@@ -227,100 +254,113 @@ export default function NotificationHost() {
     .filter((x): x is { toast: Toast; n: ObjectivNotification } => Boolean(x.n));
 
   return (
-    <div className="notif-host" ref={wrapRef}>
-      <button
-        type="button"
-        className={`notif-bell ${panelOpen ? 'active' : ''}`}
-        title="Notifications"
-        aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
-        onClick={() => setPanelOpen((o) => !o)}
-      >
-        <span className="codicon codicon-bell" aria-hidden />
-        {unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
-      </button>
+    <>
+      <div className={`notif-host ${inline ? 'notif-host--toolbar' : ''}`} ref={wrapRef}>
+        <button
+          type="button"
+          className={`notif-bell ${inline ? 'notif-bell--toolbar' : ''} ${panelOpen ? 'active' : ''}`}
+          title="Notifications"
+          aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
+          onClick={() => setPanelOpen((o) => !o)}
+        >
+          <span className="codicon codicon-bell" aria-hidden />
+          {unread > 0 && <span className="notif-badge">{unread > 9 ? '9+' : unread}</span>}
+        </button>
 
-      {panelOpen && (
-        <div className="notif-panel" role="dialog" aria-label="Notifications">
-          <div className="notif-panel-header">
-            <span>Notifications</span>
-            <div className="notif-panel-actions">
-              <button type="button" className="notif-link" onClick={markAllRead} disabled={!unread}>
-                Mark all read
-              </button>
-              <button
-                type="button"
-                className="notif-link"
-                title="Simulate chat"
-                onClick={() => injectDemo('chat')}
-              >
-                Demo
-              </button>
+        {panelOpen && (
+          <div className="notif-panel" role="dialog" aria-label="Notifications">
+            <div className="notif-panel-header">
+              <span>Notifications</span>
+              <div className="notif-panel-actions">
+                <button type="button" className="notif-link" onClick={markAllRead} disabled={!unread}>
+                  Mark all read
+                </button>
+                <button
+                  type="button"
+                  className="notif-link"
+                  title="Simulate chat"
+                  onClick={() => injectDemo('chat')}
+                >
+                  Demo
+                </button>
+              </div>
+            </div>
+            <div className="notif-list">
+              {visibleItems.length === 0 && (
+                <div className="notif-empty">No notifications for enabled channels.</div>
+              )}
+              {visibleItems.map((n) => (
+                <article
+                  key={n.id}
+                  className={`notif-item ${n.read ? 'read' : 'unread'}`}
+                  onClick={() => (n.slack ? openSlackNotification(n) : markRead(n.id))}
+                >
+                  <div className="notif-item-icon">
+                    <span className={`codicon codicon-${kindCodicon(n.kind)}`} aria-hidden />
+                  </div>
+                  <div className="notif-item-body">
+                    <div className="notif-item-meta">
+                      <span className="notif-kind">
+                        {kindLabel(n.kind)} · {n.platform}
+                      </span>
+                      <span className="notif-time">{formatRelativeTime(n.createdAt)}</span>
+                    </div>
+                    <div className="notif-title">{n.title}</div>
+                    {prefs.notifyShowPreview && <div className="notif-preview">{n.body}</div>}
+                    <div className="notif-from">{n.from}</div>
+                    <div className="notif-item-actions">
+                      {n.slack && slackActions && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSlackNotification(n);
+                          }}
+                        >
+                          Open
+                        </button>
+                      )}
+                      {(n.kind === 'chat' || n.kind === 'mail') && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openReply(n, 'panel');
+                          }}
+                        >
+                          Reply
+                        </button>
+                      )}
+                      {n.kind === 'meeting' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openReply(n, 'panel');
+                            setReplyText('Thanks — I will join.');
+                          }}
+                        >
+                          RSVP
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismiss(n.id);
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
-          <div className="notif-list">
-            {visibleItems.length === 0 && (
-              <div className="notif-empty">No notifications for enabled channels.</div>
-            )}
-            {visibleItems.map((n) => (
-              <article
-                key={n.id}
-                className={`notif-item ${n.read ? 'read' : 'unread'}`}
-                onClick={() => markRead(n.id)}
-              >
-                <div className="notif-item-icon">
-                  <span className={`codicon codicon-${kindCodicon(n.kind)}`} aria-hidden />
-                </div>
-                <div className="notif-item-body">
-                  <div className="notif-item-top">
-                    <span className="notif-kind">
-                      {kindLabel(n.kind)} · {n.platform}
-                    </span>
-                    <span className="notif-time">{formatRelativeTime(n.createdAt)}</span>
-                  </div>
-                  <div className="notif-title">{n.title}</div>
-                  {prefs.notifyShowPreview && <div className="notif-preview">{n.body}</div>}
-                  <div className="notif-from">{n.from}</div>
-                  <div className="notif-item-actions">
-                    {(n.kind === 'chat' || n.kind === 'mail') && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openReply(n, 'panel');
-                        }}
-                      >
-                        Reply
-                      </button>
-                    )}
-                    {n.kind === 'meeting' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openReply(n, 'panel');
-                          setReplyText('Thanks — I will join.');
-                        }}
-                      >
-                        RSVP
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismiss(n.id);
-                      }}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="notif-toast-stack" aria-live="polite">
         {toastNotifications.map(({ toast, n }) => (
@@ -374,7 +414,11 @@ export default function NotificationHost() {
       </div>
 
       {reply && (
-        <div className="notif-reply-card" role="dialog" aria-label="Reply">
+        <div
+          className={`notif-reply-card ${inline ? 'notif-reply-card--toolbar' : ''}`}
+          role="dialog"
+          aria-label="Reply"
+        >
           <div className="notif-reply-header">
             <span>
               Reply · {reply.notification.platform} → {reply.notification.from}
@@ -394,7 +438,11 @@ export default function NotificationHost() {
           />
           {replySentHint && <div className="notif-reply-hint">{replySentHint}</div>}
           <div className="notif-reply-actions">
-            <button type="button" disabled={replyBusy || !replyText.trim()} onClick={() => void submitReply()}>
+            <button
+              type="button"
+              disabled={replyBusy || !replyText.trim()}
+              onClick={() => void submitReply()}
+            >
               Send
             </button>
             <button type="button" className="secondary" onClick={() => setReply(null)}>
@@ -403,6 +451,6 @@ export default function NotificationHost() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
