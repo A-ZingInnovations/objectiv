@@ -11,7 +11,7 @@
    bash ~/Documents/coding-agent-project/scripts/objective-sidecar-dev.sh start
    ```
 
-3. **Objectiv desktop**: `cd ~/all-repos/aziai/desktop && npm run dev`
+3. **Objectiv desktop**: `cd ~/all-repos/objectiv/desktop && npm run dev`
 4. **File → Open Folder…** → same path as `CODEX_WORKSPACE`
 5. **Settings**: sidecar `http://127.0.0.1:8787`, pilot user if allowlist is set
 6. Work in **Explorer / editor / bottom terminal**; **Agent** for Objective tasks

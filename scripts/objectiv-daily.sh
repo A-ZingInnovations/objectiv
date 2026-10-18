@@ -3,7 +3,7 @@
 # Replaces browser Codex as the day-to-day Objective surface.
 set -euo pipefail
 ROOT="${CODING_AGENT_PROJECT:-$HOME/Documents/coding-agent-project}"
-AZIAI="${AZIAI_REPO:-$HOME/all-repos/aziai}"
+OBJECTIV_ROOT="${OBJECTIV_REPO:-${AZIAI_REPO:-$HOME/all-repos/objectiv}}"
 WORKSPACE="${CODEX_WORKSPACE:-$ROOT}"
 SIDECAR="${VITE_OBJECTIVE_SIDECAR_URL:-http://127.0.0.1:8787}"
 
@@ -28,7 +28,7 @@ print('    model:   ', c.get('model'))
 print('    events:  ', c.get('eventsDir'))
 "
 
-ENV_LOCAL="$AZIAI/app/.env.local"
+ENV_LOCAL="$OBJECTIV_ROOT/app/.env.local"
 if [[ ! -f "$ENV_LOCAL" ]]; then
   mkdir -p "$(dirname "$ENV_LOCAL")"
   cat >"$ENV_LOCAL" <<EOF
@@ -40,9 +40,9 @@ fi
 
 echo ""
 echo "Daily surface: Objectiv desktop (not the browser sidecar page)."
-echo "  cd $AZIAI/desktop && npm run dev"
+echo "  cd $OBJECTIV_ROOT/desktop && npm run dev"
 echo "  File → Open Folder… → $WORKSPACE"
 echo "  Agent panel → chat (approve modal on mutating tools)"
 echo ""
 echo "Marketplace extensions: VS Code/Cursor + Objective extension, or OpenVSCode in Objectiv."
-echo "G1: bash $AZIAI/scripts/objectiv-g1-pilot.sh"
+echo "G1: bash $OBJECTIV_ROOT/scripts/objectiv-g1-pilot.sh"

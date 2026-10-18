@@ -2,7 +2,7 @@
 # G1 pilot leg for Objectiv desktop (offline first; LLM optional).
 set -euo pipefail
 ROOT="${CODING_AGENT_PROJECT:-$HOME/Documents/coding-agent-project}"
-AZIAI="$(cd "$(dirname "$0")/.." && pwd)"
+OBJECTIV_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIDECAR="${VITE_OBJECTIVE_SIDECAR_URL:-http://127.0.0.1:8787}"
 
 echo "==> Offline harness (G1 smoke + fixture)"

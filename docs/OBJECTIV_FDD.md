@@ -187,7 +187,7 @@ This FDD describes **what** Objectiv and Objective do for users and operators: f
 | Performance | First token / tool step usable on LAN to g5; UI remains responsive during agent turn and cell queue |
 | Reliability | Sidecar disconnect surfaces clear status; no silent apply; explorer recovers after FS events |
 | Usability | Approval and reply reachable without leaving editor focus long; Appearance shortcuts match VS Code muscle memory |
-| Compatibility | macOS desktop primary; web shell supported |
+| Compatibility | Desktop: macOS, Windows, Linux (Tauri); web dev shell supported |
 | Observability | Event log per run_id; pilot user + surface tags |
 
 ## 10. Feature status snapshot (2026-10-04)

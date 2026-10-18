@@ -1,0 +1,13 @@
+@import url('objectiv-docs-pdf.css');
+
+h2 {
+  margin: 0 0 0.35em 0;
+  page-break-before: always;
+}
+
+hr {
+  border: none;
+  page-break-after: always;
+  margin: 0;
+  height: 0;
+}

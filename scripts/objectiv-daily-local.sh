@@ -2,7 +2,7 @@
 # Local wrapper — coding-agent + objective live under ~/all-repos (not Documents/).
 set -euo pipefail
 export CODING_AGENT_PROJECT="${CODING_AGENT_PROJECT:-$HOME/all-repos/coding-agent}"
-export AZIAI_REPO="${AZIAI_REPO:-$HOME/all-repos/aziai-github}"
+export OBJECTIV_REPO="${OBJECTIV_REPO:-${AZIAI_REPO:-$HOME/all-repos/objectiv}}"
 export OBJECTIVE_REPO="${OBJECTIVE_REPO:-$HOME/all-repos/objective}"
 export CODEX_WORKSPACE="${CODEX_WORKSPACE:-$CODING_AGENT_PROJECT}"
 export OBJECTIVE_WORKSPACE="${OBJECTIVE_WORKSPACE:-$CODEX_WORKSPACE}"

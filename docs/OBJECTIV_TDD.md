@@ -41,9 +41,9 @@ Eval path: SWE Docker (regression only)
 
 | Path / repo | Stack | Responsibility |
 |-------------|-------|----------------|
-| `aziai/app` | React, Monaco, Vite | Objectiv UI |
-| `aziai/desktop` | Tauri 2 (Rust) | Native window, PTY, menus, folder pickers, notebook kernel, FS watch |
-| `aziai/backend` | FastAPI + Ollama | Optional local chat backend (not primary agent) |
+| `objectiv/app` | React, Monaco, Vite | Objectiv UI |
+| `objectiv/desktop` | Tauri 2 (Rust) | Native window, PTY, menus, folder pickers, notebook kernel, FS watch |
+| `objectiv/backend` | FastAPI + Ollama | Optional local chat backend (not primary agent) |
 | `azing-codex` / `objective` | TS | Sidecar agent loop, tools, VS Code extension |
 | `coding-agent` | Python | Serve, SFT/RL, G1 scripts, Monday, docs/PDF |
 
@@ -110,8 +110,8 @@ Zoom: `app/src/zoom.ts` — VS Code–style `1.2^zoomLevel` applied to `document
 
 `app/src/branding.ts`: `PRODUCT_NAME=Objectiv`, `PRODUCT_CODE=AZO`, `PRODUCT_TAGLINE=A-Zing's Objectiv`.
 
-Logo / dock mark: transparent `docs/branding/objectiv-azo-app-icon.svg` (no square plate).  
-Dock/app icons: `bash scripts/regenerate-objectiv-app-icons.sh` → `desktop/src-tauri/icons/` (`icon.icns`, `icon.ico`, PNGs). Configured in `tauri.conf.json` → `bundle.icon`.
+Logo: `docs/branding/objectiv-azo-logo.jpg` · `app/public/objectiv-azo-logo.jpg`.  
+Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg` into `desktop/src-tauri/icons/` (`icon.icns`, `icon.ico`, PNGs). Configured in `tauri.conf.json` → `bundle.icon`.
 
 ### 5.3 Notifications
 

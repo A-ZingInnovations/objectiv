@@ -16,7 +16,7 @@
 
 ### User flow
 
-1. Launch Objectiv desktop: `cd aziai/desktop && npm run dev`
+1. Launch Objectiv desktop: `cd objectiv/desktop && npm run dev`
 2. Explorer → **Open folder…** → pick repo (e.g. `coding-agent-project`)
 3. Click files → content loaded from disk; edits **auto-save** to that path
 4. Start Objective sidecar with the **same** root:

@@ -2,6 +2,8 @@
 
 **Objectiv** (**AZO** = A-Zing's Objectiv) is the product. Not AZIAI. The **Objective** agent runs inside Objectiv.
 
+**Editions:** [Community vs Enterprise (license-based)](./OBJECTIV_EDITIONS.md) (marketplace, agent on-behalf, mail/meetings).
+
 ## Two product tracks (keep in balance)
 
 | Track | What it is | Status |

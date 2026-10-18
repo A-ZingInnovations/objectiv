@@ -1,32 +1,40 @@
-# OpenVSCode Server in Objectiv
+# OpenVSCode Server in Objectiv (legacy)
 
-Objectiv uses [OpenVSCode Server](https://github.com/gitpod-io/openvscode-server) for the **VS Code extension host** and **Extension Marketplace** inside the desktop app.
+> **Deprecated for extensions.** Use the native **Marketplace** panel and [OBJECTIV_MARKETPLACE.md](./OBJECTIV_MARKETPLACE.md). This doc remains for VPS/server maintenance.
 
-## Install (once per machine)
+Objectiv previously used [OpenVSCode Server](https://github.com/gitpod-io/openvscode-server) as an embedded VS Code extension host.
+
+## Default: hosted on A-Zing VPS
+
+Objectiv **does not** start OpenVSCode on your Mac by default. It embeds a **hosted** instance on the same VPS as **www.a-zing.org**.
+
+1. Deploy once: [deploy/openvscode-vps/README.md](../deploy/openvscode-vps/README.md)
+2. In Objectiv: **Settings → Objective → Extensions**
+   - **OpenVSCode Mode:** Hosted (A-Zing VPS)
+   - **Hosted OpenVSCode URL:** `https://www.a-zing.org/openvscode`
+   - **Connection token:** matches `OPENVSCODE_CONNECTION_TOKEN` on the server (Objectiv sends it as `?tkn=…`)
+3. **Extensions** activity bar → **Start OpenVSCode & open Extensions**
+4. Install extensions from the Marketplace inside the embedded view.
+
+Files you edit in hosted OpenVSCode are on the **server workspace volume**, not your local Objectiv folder unless you clone/sync there.
+
+## Optional: local server (legacy)
+
+Set **OpenVSCode Mode** to **Local** to spawn on this machine (Linux tarball or dev only). On macOS, prefer **hosted** mode instead of Docker.
 
 ```bash
-bash aziai/scripts/install-openvscode-server.sh
+bash objectiv/scripts/install-openvscode-server.sh   # Linux native only
 ```
 
-Optional: pin version — `OPENVSCODE_SERVER_VERSION=1.95.3 bash aziai/scripts/install-openvscode-server.sh`
+Binary: `~/.objectiv/openvscode-server/current/bin/openvscode-server`  
+Override: `export OBJECTIV_OPENVSCODE_SERVER=/path/to/openvscode-server`
 
-Binary location: `~/.objectiv/openvscode-server/current/bin/openvscode-server`
-
-Override path: `export OBJECTIV_OPENVSCODE_SERVER=/path/to/openvscode-server`
-
-## Use in Objectiv
-
-1. **File → Open Folder…** (trust the workspace).
-2. **Extensions** activity bar → **Start OpenVSCode Server**.
-3. **Open in editor area** (embedded) or **Open in browser**.
-4. In OpenVSCode: Extensions view → install from Marketplace or Open VSX.
-
-Port default **9888** — change in **Settings → OpenVSCode port**.
+Port default **9888** — change under **Local OpenVSCode Port** in Settings.
 
 ## Objective extension
 
-Install **Objective** from your local `vscode-extension` folder (Open VSX / VSIX) inside OpenVSCode, or develop with **F5** in VS Code/Cursor. Sidecar agent remains available in Objectiv’s **Agent** panel when `VITE_OBJECTIVE_SIDECAR_URL` is set.
+Install **Objective** from your local `vscode-extension` folder (Open VSX / VSIX) inside hosted OpenVSCode, or develop with **F5** in VS Code/Cursor. Sidecar agent remains in Objectiv’s **Agent** panel when `VITE_OBJECTIVE_SIDECAR_URL` is set.
 
-## Stop
+## Disconnect
 
-Extensions panel → **Stop server**, or close the workspace folder in Objectiv.
+**Extensions → Stop OpenVSCode Server** closes the embedded session in Objectiv (hosted server keeps running on the VPS).
