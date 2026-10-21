@@ -8,7 +8,11 @@ import {
   formatMessageTime,
   type ChatMessage,
 } from '../integrations/messagingHistory';
-import { fetchSlackHistory, fetchSlackWorkspace, type SlackLiveConversation } from '../integrations/slackLive';
+import {
+  fetchSlackHistory,
+  fetchSlackWorkspaceCoalesced,
+  type SlackLiveConversation,
+} from '../integrations/slackLive';
 import { slackWebClientUrl, startSlackHuddle } from '../integrations/slackNavigation';
 import { isTauriDesktop } from '../desktopWorkspace';
 import { resolveSlackToken } from '../integrations/slackToken';
@@ -113,6 +117,10 @@ export default function MessagingPanel({
 
   const workspaceSyncedAtRef = useRef(0);
   const cacheBootstrappedRef = useRef(false);
+  const threadsCountRef = useRef(0);
+  threadsCountRef.current = threads.length;
+  const refreshInFlightRef = useRef(false);
+  const openInEditor = layout === 'sidebar' && Boolean(onOpenSlackChat);
 
   const applyCachedWorkspace = useCallback((cached: NonNullable<Awaited<ReturnType<typeof loadCachedWorkspace>>>) => {
     workspaceSyncedAtRef.current = cached.workspaceSyncedAt || 0;
@@ -120,11 +128,13 @@ export default function MessagingPanel({
     setTeamName(cached.teamName);
     setThreads(sortConversationsByLatest(cached.conversations));
     setSyncState('offline');
-    setActiveId((prev) => {
-      if (prev && cached.conversations.some((t) => t.id === prev)) return prev;
-      return cached.conversations[0]?.id ?? null;
-    });
-  }, []);
+    if (!openInEditor) {
+      setActiveId((prev) => {
+        if (prev && cached.conversations.some((t) => t.id === prev)) return prev;
+        return cached.conversations[0]?.id ?? null;
+      });
+    }
+  }, [openInEditor]);
 
   useEffect(() => {
     if (!slackReady || cacheBootstrappedRef.current) return;
@@ -137,14 +147,16 @@ export default function MessagingPanel({
   const refreshSlackFromNetwork = useCallback(
     async (force = false) => {
       if (!slackReady || !syncActive) return;
+      if (refreshInFlightRef.current) return;
       const stale = Date.now() - workspaceSyncedAtRef.current > WORKSPACE_REFRESH_MS;
-      if (!force && !stale && threads.length > 0) {
+      if (!force && !stale && threadsCountRef.current > 0) {
         setSyncState((s) => (s === 'idle' ? 'offline' : s));
         return;
       }
+      refreshInFlightRef.current = true;
       setSyncError(null);
-      if (!threads.length) setSyncState('loading');
-      let showedCache = threads.length > 0;
+      if (!threadsCountRef.current) setSyncState('loading');
+      let showedCache = threadsCountRef.current > 0;
       if (!showedCache) {
         const cached = await loadCachedWorkspace();
         if (cached?.conversations.length) {
@@ -153,7 +165,10 @@ export default function MessagingPanel({
         }
       }
       try {
-        const snap = await fetchSlackWorkspace(slackToken);
+        const snap = await fetchSlackWorkspaceCoalesced(slackToken, {
+          force,
+          maxAgeMs: force ? 0 : WORKSPACE_REFRESH_MS,
+        });
         workspaceSyncedAtRef.current = Date.now();
         setTeamId(snap.teamId);
         setTeamName(snap.teamName);
@@ -161,17 +176,24 @@ export default function MessagingPanel({
         setSyncState('live');
         void saveWorkspaceToCache(snap.teamId, snap.teamName, snap.conversations);
         ingestSlackWorkspaceForNotifications(snap, (n) => pushObjectivNotification(n));
-        queueMicrotask(() => {
+        const schedulePrefetch = () => {
           onPrefetchRef.current?.(
             snap.teamId,
             snap.teamName,
             snap.conversations.map((c) => ({ id: c.id, title: c.title, unread: c.unread })),
           );
-        });
-        setActiveId((prev) => {
-          if (prev && snap.conversations.some((t) => t.id === prev)) return prev;
-          return snap.conversations[0]?.id ?? null;
-        });
+        };
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => schedulePrefetch(), { timeout: 2500 });
+        } else {
+          window.setTimeout(schedulePrefetch, 300);
+        }
+        if (!openInEditor) {
+          setActiveId((prev) => {
+            if (prev && snap.conversations.some((t) => t.id === prev)) return prev;
+            return snap.conversations[0]?.id ?? null;
+          });
+        }
       } catch (e) {
         if (!showedCache) {
           setThreads([]);
@@ -181,9 +203,11 @@ export default function MessagingPanel({
         }
         const msg = e instanceof Error ? e.message : String(e);
         setSyncError(slackErrorLabel(msg));
+      } finally {
+        refreshInFlightRef.current = false;
       }
     },
-    [applyCachedWorkspace, slackReady, slackToken, syncActive, threads.length],
+    [applyCachedWorkspace, openInEditor, slackReady, slackToken, syncActive],
   );
 
   useEffect(() => {
@@ -197,8 +221,6 @@ export default function MessagingPanel({
     }
     if (syncActive) void refreshSlackFromNetwork(false);
   }, [slackReady, syncActive, slackToken, refreshSlackFromNetwork]);
-
-  const openInEditor = layout === 'sidebar' && Boolean(onOpenSlackChat);
 
   useEffect(() => {
     if (openInEditor) {

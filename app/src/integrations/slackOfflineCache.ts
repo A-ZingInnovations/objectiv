@@ -23,6 +23,9 @@ export type SlackTeamStore = {
 const LAST_TEAM_KEY = 'objectiv.slack.lastTeamId';
 const LS_PREFIX = 'objectiv.slack.cache.v1.';
 
+/** In-memory mirror so channel saves do not re-read disk on every prefetch write. */
+const memoryStores = new Map<string, SlackTeamStore>();
+
 function lsKey(teamId: string): string {
   return `${LS_PREFIX}${teamId}`;
 }
@@ -40,6 +43,9 @@ export function lastSlackTeamId(): string {
 export async function loadSlackTeamStore(teamId: string): Promise<SlackTeamStore | null> {
   const id = teamId.trim();
   if (!id) return null;
+
+  const mem = memoryStores.get(id);
+  if (mem) return mem;
 
   if (isTauriDesktop()) {
     try {
@@ -85,6 +91,7 @@ export async function saveSlackTeamStore(store: SlackTeamStore): Promise<void> {
 
 /** Coalesce rapid channel/workspace writes so the UI thread stays responsive. */
 export function saveSlackTeamStoreDebounced(store: SlackTeamStore, delayMs = 800): void {
+  memoryStores.set(store.teamId, store);
   debouncePending.set(store.teamId, store);
   const prev = debounceTimers.get(store.teamId);
   if (prev) clearTimeout(prev);
@@ -112,10 +119,16 @@ function parseStore(raw: string): SlackTeamStore | null {
     if (parsed?.version !== SLACK_CACHE_VERSION || !parsed.teamId) return null;
     parsed.channels = parsed.channels ?? {};
     parsed.conversations = parsed.conversations ?? [];
+    memoryStores.set(parsed.teamId, parsed);
     return parsed;
   } catch {
     return null;
   }
+}
+
+function teamStoreForUpdate(teamId: string, teamName: string, loaded: SlackTeamStore | null): SlackTeamStore {
+  const id = teamId.trim();
+  return memoryStores.get(id) ?? loaded ?? emptyStore(id, teamName);
 }
 
 export async function loadCachedWorkspace(
@@ -131,14 +144,18 @@ export async function saveWorkspaceToCache(
   teamName: string,
   conversations: SlackLiveConversation[],
 ): Promise<void> {
-  const existing = (await loadSlackTeamStore(teamId)) ?? emptyStore(teamId, teamName);
-  saveSlackTeamStoreDebounced({
+  const id = teamId.trim();
+  const loaded = memoryStores.has(id) ? memoryStores.get(id)! : await loadSlackTeamStore(id);
+  const existing = teamStoreForUpdate(id, teamName, loaded);
+  const next: SlackTeamStore = {
     ...existing,
-    teamId,
+    teamId: id,
     teamName,
     conversations,
     workspaceSyncedAt: Date.now(),
-  });
+  };
+  memoryStores.set(id, next);
+  saveSlackTeamStoreDebounced(next);
 }
 
 export async function saveChannelToCache(
@@ -147,16 +164,20 @@ export async function saveChannelToCache(
   channelId: string,
   data: SlackChannelCache,
 ): Promise<void> {
-  const existing = (await loadSlackTeamStore(teamId)) ?? emptyStore(teamId, teamName);
-  saveSlackTeamStoreDebounced({
+  const id = teamId.trim();
+  const loaded = memoryStores.has(id) ? memoryStores.get(id)! : await loadSlackTeamStore(id);
+  const existing = teamStoreForUpdate(id, teamName, loaded);
+  const next: SlackTeamStore = {
     ...existing,
-    teamId,
+    teamId: id,
     teamName: teamName || existing.teamName,
     channels: {
       ...existing.channels,
       [channelId]: data,
     },
-  });
+  };
+  memoryStores.set(id, next);
+  saveSlackTeamStoreDebounced(next);
 }
 
 export function readCachedChannel(

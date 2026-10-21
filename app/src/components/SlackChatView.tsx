@@ -235,7 +235,11 @@ export default function SlackChatView({
                               </div>
                             </div>
                           ) : m.body.trim() && !isAutoAttachmentSummary(m.body, m.attachments) ? (
-                            <SlackChatMessageBody body={m.body} onJoinMeeting={onJoinMeeting} />
+                            <SlackChatMessageBody
+                              body={m.body}
+                              users={slackUsers}
+                              onJoinMeeting={onJoinMeeting}
+                            />
                           ) : null}
                           {m.attachments?.length ? (
                             <SlackMessageAttachments

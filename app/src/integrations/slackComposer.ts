@@ -1,13 +1,8 @@
 import type { SlackUserRef } from './slackLive';
+import { expandSlackMessageText } from './slackMessageFormat';
 
 export function humanizeMentions(text: string, users: SlackUserRef[]): string {
-  let out = text;
-  for (const u of users) {
-    if (!u.id.trim()) continue;
-    const escaped = u.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(`<@${escaped}>`, 'g'), `@${u.name}`);
-  }
-  return out;
+  return expandSlackMessageText(text, users);
 }
 
 export function slackifyMentions(text: string, users: SlackUserRef[]): string {

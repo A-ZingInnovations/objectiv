@@ -105,12 +105,7 @@ function asSection(raw: string): MessagingThreadSeed['section'] {
   return 'channels';
 }
 
-export async function fetchSlackWorkspace(token: string): Promise<SlackWorkspaceSnapshot> {
-  if (!isTauriDesktop()) {
-    throw new Error('Slack sync requires the Objectiv desktop app.');
-  }
-  const { invoke } = await import('@tauri-apps/api/core');
-  const snap = await invoke<RawSnapshot>('slack_fetch_workspace', { token: token.trim() });
+function mapWorkspaceSnapshot(snap: RawSnapshot): SlackWorkspaceSnapshot {
   return {
     teamId: snap.teamId,
     teamName: snap.teamName,
@@ -123,6 +118,61 @@ export async function fetchSlackWorkspace(token: string): Promise<SlackWorkspace
       latestTs: r.latestTs ?? r.latest_ts ?? '',
     })),
   };
+}
+
+export async function fetchSlackWorkspace(token: string): Promise<SlackWorkspaceSnapshot> {
+  if (!isTauriDesktop()) {
+    throw new Error('Slack sync requires the Objectiv desktop app.');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  const snap = await invoke<RawSnapshot>('slack_fetch_workspace', { token: token.trim() });
+  return mapWorkspaceSnapshot(snap);
+}
+
+type WorkspaceFetchOpts = {
+  /** Return a recent snapshot without calling Slack again. */
+  maxAgeMs?: number;
+  /** Ignore cache and in-flight coalescing. */
+  force?: boolean;
+};
+
+let workspaceInflight: Promise<SlackWorkspaceSnapshot> | null = null;
+let workspaceInflightToken = '';
+let lastWorkspaceSnap: SlackWorkspaceSnapshot | null = null;
+let lastWorkspaceAt = 0;
+
+/** One workspace fetch at a time; share results across sidebar + notification poll. */
+export async function fetchSlackWorkspaceCoalesced(
+  token: string,
+  opts?: WorkspaceFetchOpts,
+): Promise<SlackWorkspaceSnapshot> {
+  const trimmed = token.trim();
+  const maxAgeMs = opts?.maxAgeMs ?? 0;
+  if (
+    !opts?.force &&
+    maxAgeMs > 0 &&
+    lastWorkspaceSnap &&
+    lastWorkspaceAt > 0 &&
+    Date.now() - lastWorkspaceAt < maxAgeMs
+  ) {
+    return lastWorkspaceSnap;
+  }
+  if (!opts?.force && workspaceInflight && workspaceInflightToken === trimmed) {
+    return workspaceInflight;
+  }
+  workspaceInflightToken = trimmed;
+  workspaceInflight = fetchSlackWorkspace(trimmed)
+    .then((snap) => {
+      lastWorkspaceSnap = snap;
+      lastWorkspaceAt = Date.now();
+      workspaceInflight = null;
+      return snap;
+    })
+    .catch((err) => {
+      workspaceInflight = null;
+      throw err;
+    });
+  return workspaceInflight;
 }
 
 export async function fetchSlackHistory(

@@ -49,7 +49,7 @@ import {
   integrationToolbarActions,
   isChatIntegrationActive,
 } from './integrations/integrationActivity';
-import { fetchSlackWorkspace } from './integrations/slackLive';
+import { fetchSlackWorkspaceCoalesced } from './integrations/slackLive';
 import {
   SLACK_CHANNEL_POLL_IDLE_MS,
   SLACK_CHANNEL_POLL_MS,
@@ -204,6 +204,12 @@ export default function App() {
   const meetingWb = useMeetingWorkbench();
   const prefetchSlackHistoriesRef = useRef(slackChatWb.prefetchWorkspaceHistories);
   prefetchSlackHistoriesRef.current = slackChatWb.prefetchWorkspaceHistories;
+  const slackHistoryPreviewRef = useRef(slackChatWb.lastPreview);
+  slackHistoryPreviewRef.current = slackChatWb.lastPreview;
+  const slackHistoryPreview = useCallback(
+    (channelId: string) => slackHistoryPreviewRef.current(channelId),
+    [],
+  );
   const sideBarVisible = settings.sideBarVisible;
   const setSideBarVisible = useCallback(
     (next: boolean | ((prev: boolean) => boolean)) => {
@@ -2068,7 +2074,9 @@ export default function App() {
     let first = true;
     const poll = async () => {
       try {
-        const snap = await fetchSlackWorkspace(slackToken);
+        const snap = await fetchSlackWorkspaceCoalesced(slackToken, {
+          maxAgeMs: SLACK_WORKSPACE_POLL_MS,
+        });
         if (cancelled) return;
         ingestSlackWorkspaceForNotifications(
           snap,
@@ -2631,7 +2639,7 @@ export default function App() {
                   layout="sidebar"
                   syncActive={panel === 'messages' && sideBarVisible}
                   onOpenSlackChat={openSlackChatInEditor}
-                  historyPreview={slackChatWb.lastPreview}
+                  historyPreview={slackHistoryPreview}
                   onPrefetchHistories={prefetchSlackHistories}
                   onOpenSlackWeb={openSlackWebInBrowser}
                 />

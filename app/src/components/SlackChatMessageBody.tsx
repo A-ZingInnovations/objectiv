@@ -1,17 +1,26 @@
 import { useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { meetingLinkLabel, normalizeMeetingJoinUrl } from '../integrations/meetingLinks';
-import { slackMessageBodyHtml } from '../integrations/slackMessageFormat';
+import {
+  slackMessageBodyHtml,
+  type SlackMentionUser,
+} from '../integrations/slackMessageFormat';
 
 type Props = {
   body: string;
+  users?: readonly SlackMentionUser[];
   className?: string;
   onJoinMeeting?: (url: string, title: string) => void;
 };
 
-export default function SlackChatMessageBody({ body, className = '', onJoinMeeting }: Props) {
+export default function SlackChatMessageBody({
+  body,
+  users,
+  className = '',
+  onJoinMeeting,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const html = DOMPurify.sanitize(slackMessageBodyHtml(body), {
+  const html = DOMPurify.sanitize(slackMessageBodyHtml(body, users), {
     ALLOWED_TAGS: ['a'],
     ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
   });
