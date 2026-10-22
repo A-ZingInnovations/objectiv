@@ -1,8 +1,32 @@
 {
   "version": 2,
-  "updated": "2026-10-07T2",
+  "updated": "2026-10-22",
   "catalogUrl": "https://marketplace.project-objectiv.com/catalog.json",
   "entries": [
+    {
+      "id": "azing.viewer.mongo-nosql",
+      "name": "Mongo / NoSQL View",
+      "publisher": "A-Zing Innovations",
+      "version": "1.0.0",
+      "description": "Compass-style table and JSON views for local NoSQL collections, JSONL imports, and Mongo URI scratch pads.",
+      "categories": [
+        "Database",
+        "Viewers"
+      ],
+      "icon": "icons/mongo.svg",
+      "packageUrl": "packages/viewer-mongo-nosql.json",
+      "about": "Compass-style table and JSON views for local NoSQL collections, JSONL imports, and Mongo URI scratch pads. After install, a NoSQL / Mongo activity icon opens a workbench tab: browse collections as documents, filter with Mongo-style equality JSON, switch Table/JSON editing, and keep URI metadata for mongosh in the terminal.",
+      "howToAccess": [
+        "Open Objectiv desktop → Activity bar → Extensions.",
+        "Search for \"Mongo / NoSQL View\" → Install → leave Enabled on.",
+        "Activity bar → NoSQL / Mongo View (or Extensions detail → Open NoSQL View).",
+        "Use Local demo / New local collections, Import JSON or JSONL, or Save a Mongo URI for scratch + mongosh.",
+        "Filter with { \"field\": value }; click a row to edit the document as JSON."
+      ],
+      "screenshots": [
+        "screenshots/azing-viewer-mongo-nosql.svg"
+      ]
+    },
     {
       "id": "azing.theme.objectiv-ocean",
       "name": "Objectiv Ocean",

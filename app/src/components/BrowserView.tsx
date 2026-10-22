@@ -112,10 +112,11 @@ export default function BrowserView({
             <button
               type="button"
               className="browser-btn browser-btn-devtools"
-              title="Developer Tools (F12 or ⌘⌥I)"
+              title="Inspect Element / Developer Tools (F12 or ⌘⌥I)"
+              aria-label="Inspect Element"
               onClick={() => onToggleDevtools?.()}
             >
-              <span className="codicon codicon-tools" aria-hidden />
+              <span className="codicon codicon-inspect" aria-hidden />
             </button>
           )}
           <button

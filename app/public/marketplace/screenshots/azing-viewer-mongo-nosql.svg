@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" fill="none">
+  <rect width="640" height="400" rx="12" fill="#050608"/>
+  <rect x="8" y="8" width="624" height="384" rx="8" fill="#0b1f17" stroke="rgba(255,255,255,0.08)"/>
+  <rect x="8" y="8" width="52" height="384" fill="#0f2a20"/>
+  <circle cx="24" cy="28" r="6" fill="#10b981"/>
+  <rect x="68" y="8" width="160" height="384" fill="#102820"/>
+  <rect x="68" y="8" width="564" height="28" fill="#143528"/>
+  <text x="84" y="26" fill="#a7f3d0" font-family="system-ui,sans-serif" font-size="11">NoSQL / Mongo View</text>
+  <text x="84" y="58" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="10" opacity="0.8">CONNECTIONS</text>
+  <text x="84" y="82" fill="#e7ecf1" font-family="ui-monospace,monospace" font-size="11">Local demo</text>
+  <text x="96" y="102" fill="#e7ecf1" font-family="ui-monospace,monospace" font-size="11" opacity="0.75">demo</text>
+  <rect x="96" y="112" width="110" height="20" rx="3" fill="#10b981" opacity="0.35"/>
+  <text x="104" y="126" fill="#ecfdf5" font-family="ui-monospace,monospace" font-size="11">people · 3</text>
+  <rect x="236" y="44" width="388" height="28" fill="#0d221a"/>
+  <text x="248" y="62" fill="#a7f3d0" font-family="ui-monospace,monospace" font-size="11">{ "active": true }</text>
+  <rect x="236" y="80" width="388" height="280" fill="#0a1a14"/>
+  <rect x="248" y="96" width="360" height="22" fill="#143528"/>
+  <text x="256" y="111" fill="#6ee7b7" font-family="ui-monospace,monospace" font-size="10">_id          name           role      active</text>
+  <text x="256" y="138" fill="#e7ecf1" font-family="ui-monospace,monospace" font-size="10">64f0…1234    Ada Lovelace   analyst   true</text>
+  <text x="256" y="158" fill="#e7ecf1" font-family="ui-monospace,monospace" font-size="10">64f0…1235    Grace Hopper   engineer  true</text>
+  <text x="256" y="178" fill="#e7ecf1" font-family="ui-monospace,monospace" font-size="10" opacity="0.55">64f0…1236    Alan Turing    researcher false</text>
+  <text x="320" y="370" text-anchor="middle" fill="#a7f3d0" font-family="system-ui,sans-serif" font-size="11" opacity="0.55">Mongo / NoSQL View · Objectiv</text>
+</svg>

@@ -2,7 +2,7 @@
 # Stop duplicate Objectiv processes, rebuild release bundle, open one .app.
 # Dev iteration with rebuild: use objectiv-reload.sh (not --no-build here).
 set -euo pipefail
-OBJECTIV_REPO="${OBJECTIV_REPO:-${AZIAI_REPO:-$(cd "$(dirname "$0")/.." && pwd)}}"
+OBJECTIV_REPO="${OBJECTIV_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
 APP="$OBJECTIV_REPO/desktop/src-tauri/target/release/bundle/macos/Objectiv.app"
 
 bash "$OBJECTIV_REPO/scripts/objectiv-stop-all.sh"

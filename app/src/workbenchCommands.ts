@@ -1,4 +1,5 @@
 import type { ActivityPanel } from './activityPanels';
+import type { SplitDirection } from './splitLayout';
 
 export type WorkbenchCommand = {
   id: string;
@@ -24,6 +25,7 @@ export type WorkbenchActions = {
   addFolderToWorkspace: () => void;
   openQuickOpen: () => void;
   toggleSplit: () => void;
+  splitEditor?: (direction: SplitDirection) => void;
   runWorkspaceTest: () => void;
   runWorkspaceBuild: () => void;
   runDockerComposeUp: () => void;
@@ -52,6 +54,9 @@ export type WorkbenchActions = {
   openBrowserSeleniumFixture?: () => void;
   openBrowserHtmlPlayground?: () => void;
   reloadBrowserTab?: () => void;
+  openAccountSettings?: () => void;
+  openEnterpriseSso?: () => void;
+  buyEnterpriseTeam?: () => void;
 };
 
 const PANEL_SHORTCUTS: Partial<Record<ActivityPanel, string>> = {
@@ -63,6 +68,8 @@ const PANEL_SHORTCUTS: Partial<Record<ActivityPanel, string>> = {
   extensions: '⌘⇧X',
   chat: '⌘⇧A',
   browser: '⌘⇧B',
+  api: '⌘⇧U',
+  nosql: '⌘⇧N',
   messages: '⌘⇧I',
   llm: '⌘⇧L',
   terminal: '⌃`',
@@ -82,6 +89,24 @@ export function buildWorkbenchCommands(
   }));
 
   return [
+    {
+      id: 'account.signin',
+      title: 'Sign in with A-Zing…',
+      category: 'Account',
+      run: () => actions.openEnterpriseSso?.(),
+    },
+    {
+      id: 'account.buyEnterprise',
+      title: 'Buy Enterprise for your team…',
+      category: 'Account',
+      run: () => actions.buyEnterpriseTeam?.(),
+    },
+    {
+      id: 'account.activate',
+      title: 'Activate Enterprise Seat…',
+      category: 'Account',
+      run: () => actions.openAccountSettings?.(),
+    },
     {
       id: 'browser.devtools',
       title: 'Toggle Browser Developer Tools',
@@ -166,6 +191,24 @@ export function buildWorkbenchCommands(
       category: 'View',
       keybinding: '⌘\\',
       run: actions.toggleSplit,
+    },
+    {
+      id: 'editor.splitLeft',
+      title: 'Split Editor Left',
+      category: 'View',
+      run: () => actions.splitEditor?.('left'),
+    },
+    {
+      id: 'editor.splitDown',
+      title: 'Split Editor Down',
+      category: 'View',
+      run: () => actions.splitEditor?.('down'),
+    },
+    {
+      id: 'editor.splitUp',
+      title: 'Split Editor Up',
+      category: 'View',
+      run: () => actions.splitEditor?.('up'),
     },
     {
       id: 'view.toggleFullScreen',
@@ -365,6 +408,14 @@ function panelTitle(panel: ActivityPanel): string {
       return 'Objective Agent';
     case 'llm':
       return 'LLM Suite';
+    case 'api':
+      return 'API Testing';
+    case 'nosql':
+      return 'NoSQL / Mongo View';
+    case 'casf':
+      return 'CASF — Code as a Friend';
+    case 'browser':
+      return 'Browser';
     case 'terminal':
       return 'Terminal';
     case 'problems':

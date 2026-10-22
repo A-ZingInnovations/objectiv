@@ -1,6 +1,5 @@
 import { COMPANY_WORDMARK, PRODUCT_TAGLINE } from '../branding';
 import { workspaceFolderLabel } from '../desktopWorkspace';
-import { useObjectivSettings } from '../settingsContext';
 
 export type WelcomeShortcut = {
   label: string;
@@ -57,17 +56,12 @@ export default function WorkspaceWelcome({
   onOpenRecent,
   shortcuts,
 }: Props) {
-  const { settings } = useObjectivSettings();
-  const lockupClass = settings.welcomeBrandTransparent
-    ? 'workspace-welcome-azing-lockup workspace-welcome-azing-lockup--transparent'
-    : 'workspace-welcome-azing-lockup workspace-welcome-azing-lockup--glass';
-
   return (
     <div className="workspace-welcome" aria-label="Workspace">
       <div className="workspace-welcome-bg" aria-hidden />
       <img
         className="workspace-welcome-watermark"
-        src="/objectiv-azo-logo.jpg"
+        src="/objectiv-azo-logo.png"
         alt=""
         width={560}
         height={560}
@@ -75,7 +69,7 @@ export default function WorkspaceWelcome({
         aria-hidden
       />
 
-      <footer className={lockupClass}>
+      <footer className="workspace-welcome-azing-lockup workspace-welcome-azing-lockup--transparent">
         <img
           className="workspace-welcome-azing-mark"
           src="/azing-logo.png"

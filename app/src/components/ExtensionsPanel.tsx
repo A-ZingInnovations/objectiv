@@ -29,6 +29,18 @@ function contributionSummary(manifest: ObjectivAppManifest): string[] {
       lines.push(`${k}: ${String(v)}`);
     }
   }
+  if (manifest.kind === 'viewer' && c.viewer) {
+    lines.push(`Viewer feature: ${c.viewer.feature}`);
+    if (c.viewer.activityTitle) lines.push(`Activity: ${c.viewer.activityTitle}`);
+    if (c.viewer.fileExtensions?.length) {
+      lines.push(`Files: ${c.viewer.fileExtensions.map((e) => `.${e}`).join(', ')}`);
+    }
+  }
+  if (manifest.kind === 'viewer' && c.snippets?.length) {
+    for (const s of c.snippets.slice(0, 8)) {
+      lines.push(`Snippet · ${s.language}: ${s.name}`);
+    }
+  }
   return lines;
 }
 
@@ -41,6 +53,7 @@ function ExtensionActions({
 }) {
   const inst = mp.installedFor(entry.id);
   const busy = mp.busyId === entry.id;
+  const isNosqlViewer = entry.id === 'azing.viewer.mongo-nosql';
 
   if (!inst) {
     return (
@@ -66,6 +79,17 @@ function ExtensionActions({
         />
         Enabled
       </label>
+      {isNosqlViewer && inst.enabled && (
+        <button
+          type="button"
+          className="marketplace-btn primary"
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent('objectiv:open-nosql-workbench'))
+          }
+        >
+          Open NoSQL View
+        </button>
+      )}
       <button
         type="button"
         className="marketplace-btn"

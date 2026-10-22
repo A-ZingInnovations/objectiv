@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useObjectivSettings } from '../settingsContext';
-import type { ObjectivSettings } from '../aziaiSettings';
+import AccountLicensePanel from './AccountLicensePanel';
+import type { ObjectivSettings } from '../objectivSettings';
 import {
   ACCENT_PRESETS,
   WORKBENCH_COLOR_THEME_IDS,
@@ -93,6 +94,17 @@ const FIELDS: Field[] = [
     category: 'Workbench',
     section: 'Appearance',
     kind: 'toggle',
+  },
+  {
+    key: 'activityBarSide',
+    label: 'Activity Bar Side',
+    category: 'Workbench',
+    section: 'Appearance',
+    kind: 'select',
+    options: [
+      { value: 'left', label: 'Left' },
+      { value: 'right', label: 'Right' },
+    ],
   },
   {
     key: 'sideBarVisible',
@@ -463,7 +475,7 @@ const FIELDS: Field[] = [
     category: 'Integrations',
     section: 'Chat',
     kind: 'text',
-    placeholder: 'Token or webhook for the selected platform',
+    placeholder: 'Teams: Incoming Webhook URL · Slack: xoxb-…',
   },
   {
     key: 'slackAppToken',
@@ -493,7 +505,7 @@ const FIELDS: Field[] = [
     category: 'Integrations',
     section: 'Meetings',
     kind: 'text',
-    placeholder: 'Zoom personal link (https://zoom.us/j/…) or API token',
+    placeholder: 'Teams/Zoom join URL (https://teams.microsoft.com/… or zoom.us/j/…)',
   },
   {
     key: 'mailImapHost',
@@ -501,7 +513,7 @@ const FIELDS: Field[] = [
     category: 'Integrations',
     section: 'Mail (IMAP)',
     kind: 'text',
-    placeholder: 'imap.example.com',
+    placeholder: 'outlook.office365.com',
   },
   {
     key: 'mailImapPort',
@@ -638,6 +650,14 @@ const FIELDS: Field[] = [
     kind: 'text',
     placeholder: 'Local profile',
   },
+  {
+    key: 'orgWorkspaceTag',
+    label: 'Organization',
+    category: 'Account',
+    section: 'Profile',
+    kind: 'text',
+    placeholder: 'Company name',
+  },
 ];
 
 const CATEGORY_ORDER = [
@@ -657,8 +677,16 @@ function buildToc(): TocNode[] {
     if (!byCat.has(f.category)) byCat.set(f.category, new Set());
     byCat.get(f.category)!.add(f.section);
   }
+  // License is a panel (not FIELDS) — keep Profile and License as separate TOC pages.
+  if (!byCat.has('Account')) byCat.set('Account', new Set());
+  byCat.get('Account')!.add('Profile');
+  byCat.get('Account')!.add('License');
+
   const nodes: TocNode[] = CATEGORY_ORDER.filter((c) => c !== 'Sync' && byCat.has(c)).map((cat) => {
-    const sections = [...byCat.get(cat)!];
+    let sections = [...byCat.get(cat)!];
+    if (cat === 'Account') {
+      sections = ['Profile', 'License'].filter((s) => sections.includes(s));
+    }
     return {
       id: cat,
       label: cat,
@@ -669,21 +697,49 @@ function buildToc(): TocNode[] {
   return nodes;
 }
 
+/** Account menu / status bar land on License, not Profile. */
+function resolveSettingsFocus(raw: string | null | undefined): string {
+  const id = (raw || '').trim();
+  if (!id || id === 'Account') return 'Account/License';
+  return id;
+}
+
 const TOC = buildToc();
 
 function sectionId(category: string, section: string): string {
   return `${category}/${section}`;
 }
 
-export default function SettingsPanel({ onClose }: { onClose?: () => void }) {
+export default function SettingsPanel({
+  onClose,
+  initialCategory,
+}: {
+  onClose?: () => void;
+  /** Jump to a category (e.g. Account for Sign-in / Enterprise). */
+  initialCategory?: string | null;
+}) {
   const { settings, patchSettings, resetSettings, exportSettings, importSettingsFromText } =
     useObjectivSettings();
   const importRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [activeId, setActiveId] = useState('Editor');
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(TOC.map((n) => [n.id, false])),
+  const [activeId, setActiveId] = useState(() =>
+    initialCategory?.trim() ? resolveSettingsFocus(initialCategory) : 'Editor',
   );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const base = Object.fromEntries(TOC.map((n) => [n.id, false]));
+    const focus = initialCategory?.trim() ? resolveSettingsFocus(initialCategory) : '';
+    if (focus) base[focus.split('/')[0]] = true;
+    return base;
+  });
+
+  useEffect(() => {
+    const raw = initialCategory?.trim();
+    if (!raw) return;
+    const focus = resolveSettingsFocus(raw);
+    setActiveId(focus);
+    setQuery('');
+    setExpanded((prev) => ({ ...prev, [focus.split('/')[0]]: true }));
+  }, [initialCategory]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -739,10 +795,11 @@ export default function SettingsPanel({ onClose }: { onClose?: () => void }) {
   }
 
   function selectNode(id: string, hasChildren: boolean) {
-    setActiveId(id);
+    const next = id === 'Account' ? 'Account/License' : id;
+    setActiveId(next);
     setQuery('');
-    if (hasChildren) {
-      setExpanded((prev) => ({ ...prev, [id]: true }));
+    if (hasChildren || id === 'Account') {
+      setExpanded((prev) => ({ ...prev, [id.split('/')[0]]: true }));
     }
   }
 
@@ -962,6 +1019,13 @@ export default function SettingsPanel({ onClose }: { onClose?: () => void }) {
               {group.fields.map(renderField)}
             </section>
           ))}
+
+          {(activeId === 'Account/License' ||
+            (searching &&
+              (query.toLowerCase().includes('license') ||
+                query.toLowerCase().includes('enterprise') ||
+                query.toLowerCase().includes('sign') ||
+                query.toLowerCase().includes('seat')))) && <AccountLicensePanel />}
 
           {searching && filtered.length === 0 && (
             <p className="settings-note">No settings match “{query}”.</p>

@@ -31,11 +31,59 @@ import SplitEditorArea, {
   type EditorPaneId,
   type EditorPaneProps,
 } from './components/SplitEditorArea';
+import DocumentPane from './components/DocumentPane';
 import ProblemsPanel from './components/ProblemsPanel';
 import BottomPanel from './components/BottomPanel';
 import BrowserView from './components/BrowserView';
 import BrowserPanel from './components/BrowserPanel';
 import SlackChatView from './components/SlackChatView';
+import ApiRequestView from './components/ApiRequestView';
+import NosqlWorkbenchView from './components/NosqlWorkbenchView';
+import CasfPanel from './components/CasfPanel';
+import CasfSessionView from './components/CasfSessionView';
+import { CASF_HOME_TAB, isCasfTab } from './casfWorkbench';
+import {
+  collectLeaves,
+  countLeaves,
+  createRootLeaf,
+  findLeaf,
+  flattenLayout,
+  mapLeaf,
+  MAX_EDITOR_GROUPS,
+  removeLeaf,
+  setBranchSizes,
+  splitLeafInLayout,
+  withPaneTab,
+  type EditorLeaf,
+  type EditorNode,
+  type SplitDirection,
+} from './splitLayout';
+import {
+  ENTERPRISE_SSO_BUY_URL,
+  ENTERPRISE_SSO_LOGIN_URL,
+} from './enterpriseAuth';
+import { canUseCasf, editionLabel } from './objectivEdition';
+import {
+  apiTabId,
+  isApiTab,
+  loadApiCollections,
+  loadApiHistory,
+  newRequest,
+  requestIdFromApiTab,
+  saveApiCollections,
+  saveApiHistory,
+  type ApiCollection,
+  type ApiHistoryEntry,
+  type ApiRequest,
+} from './apiTesting';
+import {
+  isNosqlTab,
+  NOSQL_TAB,
+} from './nosqlWorkbench';
+import {
+  isMongoNosqlExtensionEnabled,
+  subscribeViewerFeatures,
+} from './marketplace/viewerRuntime';
 import { useBrowserWorkbench } from './useBrowserWorkbench';
 import { useSlackChatWorkbench } from './useSlackChatWorkbench';
 import { isSlackChatTab, slackChatTabTitle } from './slackChat';
@@ -90,7 +138,7 @@ import { ACTIVITY_BAR_ITEMS, panelShowsSidebar } from './activityPanels';
 import { pathToLanguage } from './workspace';
 import {
   applyFileSaveTransforms,
-} from './aziaiSettings';
+} from './objectivSettings';
 import {
   base64ToUint8Array,
   isBinaryViewer,
@@ -145,7 +193,7 @@ import {
   listenTerminalPopoutEvents,
   openTerminalPopout,
 } from './terminalPopout';
-import { loadSettings } from './aziaiSettings';
+import { loadSettings } from './objectivSettings';
 import {
   clampZoomLevel,
   ZOOM_LEVEL_DEFAULT,
@@ -157,7 +205,7 @@ function shellQuote(s: string): string {
 }
 
 const HELP_URLS = {
-  parity: 'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
+  parity: 'https://www.project-objectiv.com/docs/',
   extension: 'https://github.com/A-ZingInnovations/objective/tree/main/vscode-extension',
 } as const;
 
@@ -175,7 +223,11 @@ function diffTabId(pending: PendingEdit): string {
 }
 
 export default function App() {
-  const { settings, patchSettings, exportSettings, importSettingsFromText } = useObjectivSettings();
+  const { settings, patchSettings, exportSettings, importSettingsFromText, edition, license } =
+    useObjectivSettings();
+  const [settingsFocus, setSettingsFocus] = useState<{ category: string; nonce: number } | null>(
+    null,
+  );
   const isDesktop = useIsTauriDesktop();
   const sidecarUrl = settings.sidecarUrl.replace(/\/$/, '');
 
@@ -228,9 +280,58 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [diffTabs, setDiffTabs] = useState<Record<string, DiffTabPayload>>({});
   const [agentPending, setAgentPending] = useState<PendingEdit | null>(null);
-  const [splitEnabled, setSplitEnabled] = useState(false);
-  const [splitTab, setSplitTab] = useState<string | null>(null);
+  /** Nested split tree — each branch keeps its own axis (right vs down stay independent). */
+  const [editorLayout, setEditorLayout] = useState<EditorNode>(() => createRootLeaf());
   const [editorFocus, setEditorFocus] = useState<EditorPaneId>('primary');
+  const editorLeaves = useMemo(() => collectLeaves(editorLayout), [editorLayout]);
+  const splitEnabled = editorLeaves.length > 1;
+
+  const focusedEditorPath = useMemo(() => {
+    const leaf = findLeaf(editorLayout, editorFocus);
+    return leaf?.path ?? editorLeaves[0]?.path ?? activeTab;
+  }, [editorLayout, editorFocus, editorLeaves, activeTab]);
+
+  const editorLayoutRef = useRef(editorLayout);
+  editorLayoutRef.current = editorLayout;
+  const editorFocusRef = useRef(editorFocus);
+  editorFocusRef.current = editorFocus;
+
+  const focusEditorPane = useCallback((pane: EditorPaneId) => {
+    setEditorFocus(pane);
+    const leaf = findLeaf(editorLayoutRef.current, pane);
+    if (leaf) setActiveTab(leaf.path);
+  }, []);
+
+  /** Open/activate a path in a pane (adds to that leaf's tab list only). */
+  const assignPathToPane = useCallback((pane: EditorPaneId, path: string) => {
+    setEditorLayout((root) => mapLeaf(root, pane, (leaf) => withPaneTab(leaf, path, true)));
+    setEditorFocus(pane);
+    setActiveTab(path);
+  }, []);
+
+  // Single leaf: keep tabs/path mirrored with the global openTabs / activeTab.
+  useEffect(() => {
+    setEditorLayout((root) => {
+      if (root.type !== 'leaf') return root;
+      const samePath = root.path === activeTab;
+      const sameTabs =
+        root.tabs.length === openTabs.length && root.tabs.every((t, i) => t === openTabs[i]);
+      if (samePath && sameTabs) return root;
+      return { ...root, path: activeTab, tabs: openTabs };
+    });
+  }, [activeTab, openTabs]);
+  const [apiCollections, setApiCollections] = useState<ApiCollection[]>(() => loadApiCollections());
+  const [apiHistory, setApiHistory] = useState<ApiHistoryEntry[]>(() => loadApiHistory());
+  const folderPickerLockRef = useRef(false);
+  const handleMenuIdRef = useRef<(id: string) => void>(() => {});
+
+  useEffect(() => {
+    saveApiCollections(apiCollections);
+  }, [apiCollections]);
+
+  useEffect(() => {
+    saveApiHistory(apiHistory);
+  }, [apiHistory]);
   const [lspDiagnostics, setLspDiagnostics] = useState<DiagnosticsByPath>({});
   const [validationDiagnostics, setValidationDiagnostics] = useState<DiagnosticsByPath>({});
   const diagnostics = useMemo(
@@ -332,11 +433,12 @@ export default function App() {
   }, []);
 
   const openFile = useCallback(
-    async (path: string, opts?: { roots?: string[] }) => {
+    async (path: string, opts?: { roots?: string[]; pane?: EditorPaneId }) => {
       const display = displayPath(path);
       const kind = viewerKindFromPath(display);
       const needsBinary = isBinaryViewer(kind);
       const roots = opts?.roots ?? workspaceRoots;
+      const targetPane = opts?.pane ?? editorFocus;
       const parsedOpen = parseDiskPath(path);
       if (parsedOpen) setActiveRootIndex(parsedOpen.rootIndex);
 
@@ -390,13 +492,9 @@ export default function App() {
 
       pushRecentFile(path);
       setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
-      if (splitEnabled && editorFocus === 'secondary') {
-        setSplitTab(path);
-      } else {
-        setActiveTab(path);
-      }
+      assignPathToPane(targetPane, path);
     },
-    [workspaceRoots, binaryFiles, splitEnabled, editorFocus],
+    [workspaceRoots, binaryFiles, editorFocus, assignPathToPane],
   );
 
   const openFileAt = useCallback(
@@ -407,16 +505,50 @@ export default function App() {
     [openFile],
   );
 
+  const activateInFocusedPane = useCallback(
+    (path: string) => {
+      setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
+      assignPathToPane(editorFocus, path);
+    },
+    [editorFocus, assignPathToPane],
+  );
+
+  const closeSplit = useCallback(() => {
+    const keep =
+      findLeaf(editorLayout, editorFocus)?.path ?? editorLeaves[0]?.path ?? activeTab;
+    const merged = flattenLayout(editorLayout, keep);
+    setEditorLayout(merged);
+    setOpenTabs(merged.tabs);
+    setEditorFocus('primary');
+    setActiveTab(merged.path);
+  }, [editorLayout, editorFocus, editorLeaves, activeTab]);
+
+  /**
+   * Split the focused leaf in a direction. Nested branches keep independent axes
+   * (split right then split down → L|R with the focused side stacked, not everything vertical).
+   * The active file moves into the new directional pane only.
+   */
+  const splitEditor = useCallback(
+    (direction: SplitDirection) => {
+      const focused = findLeaf(editorLayout, editorFocus);
+      const source = focused?.path ?? activeTab;
+      if (!source) return;
+      if (countLeaves(editorLayout) >= MAX_EDITOR_GROUPS) return;
+      const result = splitLeafInLayout(editorLayout, editorFocus, direction, source, {
+        move: true,
+      });
+      if (!result) return;
+      setEditorLayout(result.root);
+      setEditorFocus(result.focusId);
+      setActiveTab(source);
+    },
+    [activeTab, editorFocus, editorLayout],
+  );
+
   const toggleSplit = useCallback(() => {
-    setSplitEnabled((on) => {
-      if (on) {
-        setSplitTab(null);
-        return false;
-      }
-      setSplitTab(activeTab);
-      return true;
-    });
-  }, [activeTab]);
+    if (splitEnabled) closeSplit();
+    else splitEditor('right');
+  }, [closeSplit, splitEnabled, splitEditor]);
 
   useEffect(() => {
     const onSplit = () => toggleSplit();
@@ -500,11 +632,47 @@ export default function App() {
         next.delete(path);
         return next;
       });
-      if (path === splitTab) setSplitTab(null);
+      setEditorLayout((root) => {
+        let next = root;
+        for (const leaf of collectLeaves(root)) {
+          if (!leaf.tabs.includes(path) && leaf.path !== path) continue;
+          next = mapLeaf(next, leaf.id, (l) => {
+            const tabs = l.tabs.filter((t) => t !== path);
+            const leafPath =
+              l.path === path ? (tabs.length ? tabs[tabs.length - 1]! : null) : l.path;
+            return { ...l, tabs, path: leafPath };
+          });
+        }
+        // Drop empty leaves so a closed last-tab in a group removes that split pane.
+        for (const leaf of collectLeaves(next)) {
+          if (leaf.tabs.length === 0 && countLeaves(next) > 1) {
+            const trimmed = removeLeaf(next, leaf.id);
+            if (trimmed) next = trimmed;
+          }
+        }
+        const focusStillThere = findLeaf(next, editorFocusRef.current);
+        if (!focusStillThere) {
+          const first = collectLeaves(next)[0];
+          if (first) {
+            setEditorFocus(first.id);
+            if (first.path) setActiveTab(first.path);
+          }
+        }
+        return next;
+      });
       setOpenTabs((t) => {
         const nextTabs = t.filter((p) => p !== path);
+        // Prefer the focused pane's remaining tab — not another group's file.
+        const focused = findLeaf(editorLayoutRef.current, editorFocusRef.current);
+        const focusedNext =
+          focused && (focused.tabs.includes(path) || focused.path === path)
+            ? focused.tabs.filter((p) => p !== path)
+            : focused?.tabs;
         setActiveTab((current) => {
           if (current !== path) return current;
+          if (focusedNext && focusedNext.length > 0) {
+            return focusedNext[focusedNext.length - 1] ?? null;
+          }
           if (nextTabs.length === 0) return null;
           const i = t.indexOf(path);
           return nextTabs[Math.min(i, nextTabs.length - 1)] ?? nextTabs[0];
@@ -512,7 +680,125 @@ export default function App() {
         return nextTabs;
       });
     },
-    [splitTab, browserWb, meetingWb],
+    [browserWb, meetingWb],
+  );
+
+  const findApiRequest = useCallback(
+    (requestId: string): ApiRequest | null => {
+      for (const col of apiCollections) {
+        const hit = col.requests.find((r) => r.id === requestId);
+        if (hit) return hit;
+      }
+      return null;
+    },
+    [apiCollections],
+  );
+
+  const openApiRequest = useCallback(
+    (requestId: string) => {
+      const tab = apiTabId(requestId);
+      activateInFocusedPane(tab);
+      setPanel('api');
+    },
+    [activateInFocusedPane],
+  );
+
+  const upsertScratchRequest = useCallback((req: ApiRequest) => {
+    setApiCollections((cols) => {
+      const idx = cols.findIndex((c) => c.id === 'col-scratch');
+      if (idx < 0) {
+        return [{ id: 'col-scratch', name: 'Requests', requests: [req] }, ...cols];
+      }
+      return cols.map((col, i) =>
+        i === idx ? { ...col, requests: [...col.requests, req] } : col,
+      );
+    });
+  }, []);
+
+  /** Activity-bar / shortcut: open API Testing as an editor tab (no sidebar). */
+  const openApiWorkbench = useCallback(() => {
+    setPanel('api');
+    const openApiTab = openTabs.find(isApiTab);
+    if (openApiTab) {
+      activateInFocusedPane(openApiTab);
+      return;
+    }
+    const req = newRequest({ name: 'Untitled Request' });
+    upsertScratchRequest(req);
+    activateInFocusedPane(apiTabId(req.id));
+  }, [openTabs, activateInFocusedPane, upsertScratchRequest]);
+
+  const [nosqlExtensionEnabled, setNosqlExtensionEnabled] = useState(false);
+  useEffect(() => {
+    return subscribeViewerFeatures(() => {
+      void isMongoNosqlExtensionEnabled().then(setNosqlExtensionEnabled);
+    });
+  }, []);
+
+  /** Activity-bar / shortcut: open NoSQL / Mongo workbench tab. */
+  const openNosqlWorkbench = useCallback(() => {
+    setPanel('nosql');
+    activateInFocusedPane(NOSQL_TAB);
+  }, [activateInFocusedPane]);
+
+  const openCasfSession = useCallback(() => {
+    if (!canUseCasf(edition)) {
+      setSettingsFocus({ category: 'Account', nonce: Date.now() });
+      setPanel('settings');
+      return;
+    }
+    setPanel('casf');
+    setSideBarVisible(true);
+    activateInFocusedPane(CASF_HOME_TAB);
+  }, [activateInFocusedPane, edition]);
+
+  useEffect(() => {
+    const onOpen = () => openNosqlWorkbench();
+    window.addEventListener('objectiv:open-nosql-workbench', onOpen);
+    return () => window.removeEventListener('objectiv:open-nosql-workbench', onOpen);
+  }, [openNosqlWorkbench]);
+
+  const updateApiRequest = useCallback((next: ApiRequest) => {
+    setApiCollections((cols) => {
+      let found = false;
+      const mapped = cols.map((col) => ({
+        ...col,
+        requests: col.requests.map((r) => {
+          if (r.id === next.id) {
+            found = true;
+            return next;
+          }
+          return r;
+        }),
+      }));
+      if (found) return mapped;
+      const scratch = mapped.find((c) => c.id === 'col-scratch');
+      if (scratch) {
+        return mapped.map((col) =>
+          col.id === 'col-scratch' ? { ...col, requests: [...col.requests, next] } : col,
+        );
+      }
+      return [{ id: 'col-scratch', name: 'Requests', requests: [next] }, ...mapped];
+    });
+  }, []);
+
+  const addApiRequestTab = useCallback(() => {
+    const req = newRequest({ name: 'Untitled Request' });
+    upsertScratchRequest(req);
+    openApiRequest(req.id);
+  }, [upsertScratchRequest, openApiRequest]);
+
+  const openApiHistoryEntry = useCallback(
+    (entry: ApiHistoryEntry) => {
+      const snapshot = {
+        ...entry.request,
+        id: `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        name: entry.request.name || entry.name || 'From history',
+      };
+      updateApiRequest(snapshot);
+      openApiRequest(snapshot.id);
+    },
+    [openApiRequest, updateApiRequest],
   );
 
   const openDiffTab = useCallback((pending: PendingEdit) => {
@@ -838,8 +1124,7 @@ export default function App() {
       setValidationDiagnostics({});
       setDirtyPaths(new Set());
       setScrollTargets({});
-      setSplitEnabled(false);
-      setSplitTab(null);
+      setEditorLayout(createRootLeaf());
       setEditorFocus('primary');
       setAgentPending(null);
       setBottomPanelOpen(false);
@@ -877,6 +1162,9 @@ export default function App() {
         );
         return;
       }
+      // Prevent stacked native dialogs (menu listener churn / double clicks).
+      if (folderPickerLockRef.current) return;
+      folderPickerLockRef.current = true;
       folderActionRef.current = action;
       try {
         const root = await pickWorkspaceFolder();
@@ -889,6 +1177,8 @@ export default function App() {
       } catch (e) {
         console.error(e);
         alert(`Open Folder failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        folderPickerLockRef.current = false;
       }
     },
     [commitFolderPick],
@@ -1078,6 +1368,12 @@ export default function App() {
     setPanel(p);
   }, []);
 
+  /** Settings → Account (Sign-in / Enterprise seat activation). */
+  const openAccountSettings = useCallback(() => {
+    setSettingsFocus({ category: 'Account', nonce: Date.now() });
+    setPanel('settings');
+  }, []);
+
   const showWorkbenchPanel = useCallback(
     (p: ActivityPanel) => {
       if (p === 'terminal') {
@@ -1089,6 +1385,7 @@ export default function App() {
         return;
       }
       if (p === 'settings') {
+        setSettingsFocus(null);
         setPanel((current) => (current === 'settings' ? 'explorer' : 'settings'));
         return;
       }
@@ -1108,6 +1405,19 @@ export default function App() {
         }
         return;
       }
+      if (p === 'api') {
+        openApiWorkbench();
+        return;
+      }
+      if (p === 'nosql') {
+        openNosqlWorkbench();
+        return;
+      }
+      if (p === 'casf') {
+        setSideBarVisible(true);
+        setPanel('casf');
+        return;
+      }
       // VS Code: same activity icon toggles the side bar closed / open.
       setPanel((current) => {
         if (current === p && sideBarVisible) {
@@ -1118,7 +1428,7 @@ export default function App() {
         return p;
       });
     },
-    [toggleBottomPanelTab, sideBarVisible, openTabs, browserWb],
+    [toggleBottomPanelTab, sideBarVisible, openTabs, browserWb, openApiWorkbench, openNosqlWorkbench],
   );
 
   const welcomeShortcuts = useMemo((): WelcomeShortcut[] => {
@@ -1241,7 +1551,9 @@ export default function App() {
       else if (id.startsWith('view_')) {
         const panelId = id.replace('view_', '') as ActivityPanel;
         showWorkbenchPanel(panelId);
-      } else if (id === 'account_settings') openSidePanel('settings');
+      } else if (id === 'account_signin') void openExternal(ENTERPRISE_SSO_LOGIN_URL);
+      else if (id === 'account_buy_enterprise') void openExternal(ENTERPRISE_SSO_BUY_URL);
+      else if (id === 'account_activate' || id === 'account_settings') openAccountSettings();
       else if (id === 'sync_export') exportSettings();
       else if (id === 'sync_import') syncImportRef.current?.click();
       else if (id === 'help_parity') void openExternal(HELP_URLS.parity);
@@ -1255,6 +1567,7 @@ export default function App() {
       exportSettings,
       showWorkbenchPanel,
       openSidePanel,
+      openAccountSettings,
       zoomIn,
       zoomOut,
       zoomReset,
@@ -1268,18 +1581,31 @@ export default function App() {
     ],
   );
 
+  handleMenuIdRef.current = handleMenuId;
+
+  // Stable menu subscription — do not rebind when handleMenuId identity changes
+  // (that stacked listeners and re-opened the folder picker in a loop).
   useEffect(() => {
     if (!isDesktop) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     void (async () => {
       const { listen } = await import('@tauri-apps/api/event');
+      if (disposed) return;
       unlisten = await listen<string>('objectiv-menu', (e) => {
         console.info('[objectiv] menu', e.payload);
-        handleMenuId(e.payload);
+        handleMenuIdRef.current(e.payload);
       });
+      if (disposed) {
+        unlisten();
+        unlisten = undefined;
+      }
     })();
-    return () => unlisten?.();
-  }, [handleMenuId, isDesktop]);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [isDesktop]);
 
   // Recent folders for welcome + migrate legacy session list into recents once.
   useEffect(() => {
@@ -1430,12 +1756,21 @@ export default function App() {
 
   const openFileToSide = useCallback(
     async (path: string) => {
-      setSplitEnabled(true);
-      setSplitTab(path);
-      setEditorFocus('secondary');
-      await openFile(path);
+      let pane = editorFocus;
+      if (countLeaves(editorLayout) < MAX_EDITOR_GROUPS) {
+        const result = splitLeafInLayout(editorLayout, editorFocus, 'right', path, {
+          move: false,
+        });
+        if (result) {
+          setEditorLayout(result.root);
+          pane = result.focusId;
+          setEditorFocus(pane);
+          setActiveTab(path);
+        }
+      }
+      await openFile(path, { pane });
     },
-    [openFile],
+    [openFile, editorLayout, editorFocus],
   );
 
   const copyExplorerPath = useCallback(
@@ -1919,8 +2254,6 @@ export default function App() {
   const activeBrowserSession = browserWb.activeSessionFor(activeTab);
   const activeSlackChat =
     activeTab && isSlackChatTab(activeTab) ? slackChatWb.sessionForTab(activeTab) : undefined;
-  const activeMeeting =
-    activeTab && isMeetingTab(activeTab) ? meetingWb.sessionForTab(activeTab) : undefined;
   const browserTabActive = Boolean(activeBrowserSession);
   const openIntegrationPanel = useCallback(
     (p: 'messages' | 'meetings') => {
@@ -1947,12 +2280,11 @@ export default function App() {
   const ensureBrowserEditorTab = useCallback(() => {
     if (activeBrowserSession) return activeBrowserSession.id;
     const id = browserWb.openBrowserTab();
-    setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
-    setActiveTab(id);
+    activateInFocusedPane(id);
     setPanel('browser');
     setSideBarVisible(true);
     return id;
-  }, [activeBrowserSession, browserWb]);
+  }, [activeBrowserSession, browserWb, activateInFocusedPane]);
 
   const openMeetingInTab = useCallback(
     (url: string, title: string) => {
@@ -1973,12 +2305,12 @@ export default function App() {
           browserWb.closeBrowserTab(tabId);
         }
       }
-      setActiveTab(id);
+      activateInFocusedPane(id);
       if (isTauriDesktop()) {
         void import('./browserWebview').then(({ focusBrowserWebview }) => focusBrowserWebview(id));
       }
     },
-    [meetingWb],
+    [meetingWb, browserWb, activateInFocusedPane],
   );
 
   const openInObjectivBrowser = useCallback(
@@ -1992,12 +2324,11 @@ export default function App() {
       if (tabTitle?.trim()) {
         browserWb.patchSession(id, { title: tabTitle.trim() });
       }
-      setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
-      setActiveTab(id);
+      activateInFocusedPane(id);
       setPanel('browser');
       setSideBarVisible(true);
     },
-    [browserWb, openMeetingInTab],
+    [browserWb, openMeetingInTab, activateInFocusedPane],
   );
 
   const openSlackWebInBrowser = useCallback(
@@ -2012,13 +2343,12 @@ export default function App() {
       slackChatWb.registerTeamName(teamId, teamName);
       markSlackChannelSeen(channelId, latestTs);
       const id = slackChatWb.openSlackChatTab(teamId, channelId, title);
-      setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
-      setActiveTab(id);
+      activateInFocusedPane(id);
       if (slackToken) {
         void slackChatWb.loadHistoryForTab(slackToken, channelId, teamName, true);
       }
     },
-    [slackChatWb, slackToken],
+    [slackChatWb, slackToken, activateInFocusedPane],
   );
 
   const slackNotificationActions = useMemo((): SlackNotificationActions | undefined => {
@@ -2194,6 +2524,7 @@ export default function App() {
           newFile: addFile,
           addFolderToWorkspace: () => void addFolderToWorkspace(),
           toggleSplit,
+          splitEditor,
           runWorkspaceTest,
           runWorkspaceBuild,
           runDockerComposeUp,
@@ -2232,6 +2563,9 @@ export default function App() {
           openBrowserSeleniumFixture: () => openBrowserFixture('selenium'),
           openBrowserHtmlPlayground: () => openBrowserFixture('html-playground'),
           reloadBrowserTab: reloadActiveBrowserTab,
+          openAccountSettings,
+          openEnterpriseSso: () => void openExternal(ENTERPRISE_SSO_LOGIN_URL),
+          buyEnterpriseTeam: () => void openExternal(ENTERPRISE_SSO_BUY_URL),
         },
         { canOpenAgentDiff, workspaceOpen: hasWorkspaceOpen, browserTabActive },
       ),
@@ -2241,6 +2575,7 @@ export default function App() {
       formatActiveDocument,
       addFolderToWorkspace,
       toggleSplit,
+      splitEditor,
       runWorkspaceTest,
       runWorkspaceBuild,
       runDockerComposeUp,
@@ -2271,6 +2606,7 @@ export default function App() {
       openBrowserFixture,
       reloadActiveBrowserTab,
       browserTabActive,
+      openAccountSettings,
     ],
   );
 
@@ -2329,22 +2665,6 @@ export default function App() {
   const activeDiff = activeTab?.startsWith('diff:') ? diffTabs[activeTab] : null;
   const activeContent =
     activeTab && !activeDiff && !activeBrowserSession ? files[activeTab] ?? '' : '';
-  const setActiveContent = useCallback(
-    (content: string) => {
-      if (activeTab) setFileContent(activeTab, content);
-    },
-    [activeTab, setFileContent],
-  );
-
-  const secondaryPath = splitTab ?? activeTab;
-  const secondaryContent = secondaryPath ? files[secondaryPath] ?? '' : '';
-  const setSecondaryContent = useCallback(
-    (content: string) => {
-      if (secondaryPath) setFileContent(secondaryPath, content);
-    },
-    [secondaryPath, setFileContent],
-  );
-
   const lineCount = activeContent ? activeContent.split(/\n/).length : 0;
   const treeKeys = mode === 'disk' ? filePaths : Object.keys(files);
   const workspaceFileRels = useMemo(
@@ -2438,20 +2758,277 @@ export default function App() {
     };
   };
 
-  const handleTabSelect = (path: string) => {
-    if (browserWb.isBrowserTab(path)) {
-      setActiveTab(path);
-      setPanel('browser');
-      setSideBarVisible(true);
+  const handleTabSelect = (path: string, pane?: EditorPaneId) => {
+    const target = pane ?? editorFocus;
+    if (pane) setEditorFocus(pane);
+
+    if (
+      browserWb.isBrowserTab(path) ||
+      isSlackChatTab(path) ||
+      isMeetingTab(path) ||
+      isApiTab(path) ||
+      isNosqlTab(path) ||
+      isCasfTab(path) ||
+      path.startsWith('diff:')
+    ) {
+      setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
+      assignPathToPane(target, path);
+      if (browserWb.isBrowserTab(path)) {
+        setPanel('browser');
+        setSideBarVisible(true);
+      } else if (isApiTab(path)) {
+        setPanel('api');
+      } else if (isNosqlTab(path)) {
+        setPanel('nosql');
+      } else if (isCasfTab(path)) {
+        setPanel('casf');
+        setSideBarVisible(true);
+      }
       return;
     }
-    if (splitEnabled && editorFocus === 'secondary') {
-      setSplitTab(path);
-      void openFile(path);
-    } else {
-      void openFile(path);
-    }
+
+    void openFile(path, { pane: target });
   };
+
+  const tabLabelFor = useCallback(
+    (path: string) => {
+      if (browserWb.isBrowserTab(path)) return browserWb.tabTitle(path);
+      if (isSlackChatTab(path)) return slackChatTabTitle(slackChatWb.sessionForTab(path), path);
+      if (isMeetingTab(path)) return meetingTabTitle(meetingWb.sessionForTab(path), path);
+      if (isApiTab(path)) {
+        const id = requestIdFromApiTab(path);
+        const req = id ? findApiRequest(id) : null;
+        return req?.name ?? 'API Request';
+      }
+      if (isNosqlTab(path)) return 'NoSQL / Mongo';
+      if (isCasfTab(path)) return 'CASF Session';
+      return path.split(/[/\\]/).pop() ?? path;
+    },
+    [browserWb, slackChatWb, meetingWb, findApiRequest],
+  );
+
+  const renderWorkbenchPath = (path: string | null, pane: EditorPaneId) => {
+    if (!path) {
+      return (
+        <WorkspaceWelcome
+          diskMode={mode === 'disk' && hasWorkspaceOpen}
+          recentFolders={recentWorkspacePaths}
+          onOpenRecent={openRecentWorkspace}
+          shortcuts={welcomeShortcuts}
+        />
+      );
+    }
+
+    const meeting =
+      isMeetingTab(path) ? meetingWb.sessionForTab(path) : undefined;
+    if (meeting) {
+      return (
+        <MeetingTabView
+          session={meeting}
+          onReload={() => meetingWb.reloadTab(meeting.tabId)}
+        />
+      );
+    }
+
+    const slack =
+      isSlackChatTab(path) ? slackChatWb.sessionForTab(path) : undefined;
+    if (slack) {
+      return (
+        <SlackChatView
+          session={slack}
+          onLoadOlder={
+            slack.nextCursor && slackToken
+              ? () =>
+                  void slackChatWb.loadOlderForTab(
+                    slackToken,
+                    slack.channelId,
+                    slack.nextCursor!,
+                  )
+              : undefined
+          }
+          onOpenSlackWeb={() =>
+            openSlackWebInBrowser(
+              slackWebClientUrl(slack.teamId, slack.channelId),
+              slack.title,
+            )
+          }
+          onRefresh={
+            slackToken
+              ? () =>
+                  void slackChatWb.loadHistoryForTab(
+                    slackToken,
+                    slack.channelId,
+                    slack.title,
+                    true,
+                  )
+              : undefined
+          }
+          slackToken={slackToken || undefined}
+          onSend={
+            slackToken
+              ? (payload) =>
+                  slackChatWb.sendMessageForTab(slackToken, slack.channelId, payload)
+              : undefined
+          }
+          onEditMessage={
+            slackToken
+              ? (messageTs, text) =>
+                  slackChatWb.editMessageForTab(
+                    slackToken,
+                    slack.channelId,
+                    messageTs,
+                    text,
+                  )
+              : undefined
+          }
+          onToggleReaction={
+            slackToken
+              ? (messageTs, name, remove) =>
+                  slackChatWb.toggleReactionForTab(
+                    slackToken,
+                    slack.channelId,
+                    messageTs,
+                    name,
+                    remove,
+                  )
+              : undefined
+          }
+          onJoinMeeting={openMeetingInTab}
+          onOpenInBrowser={openSlackWebInBrowser}
+        />
+      );
+    }
+
+    const browser = browserWb.activeSessionFor(path);
+    if (browser) {
+      return (
+        <BrowserView
+          key={browser.id}
+          session={browser}
+          webviewActive={editorFocus === pane}
+          bookmarked={browserWb.bookmarks.some((b) => b.url === browser.url)}
+          onNavigate={(url) => browserWb.navigateBrowser(browser.id, url)}
+          onInputChange={(value) => browserWb.patchSession(browser.id, { input: value })}
+          onBack={() => browserWb.goHistory(browser.id, -1)}
+          onForward={() => browserWb.goHistory(browser.id, 1)}
+          onReload={() =>
+            browserWb.patchSession(browser.id, {
+              reloadToken: browser.reloadToken + 1,
+            })
+          }
+          onToggleBookmark={() => browserWb.toggleBookmark(browser.url, browser.title)}
+          onToggleDevtools={toggleActiveBrowserDevtools}
+          onOpenFixture={(id) => openBrowserFixture(id)}
+          onOpenExtensions={() => setPanel('extensions')}
+        />
+      );
+    }
+
+    if (isApiTab(path)) {
+      const reqId = requestIdFromApiTab(path);
+      const req = reqId ? findApiRequest(reqId) : null;
+      if (!req) {
+        return <p className="api-response-empty">Request was deleted.</p>;
+      }
+      return (
+        <ApiRequestView
+          request={req}
+          onChange={updateApiRequest}
+          history={apiHistory}
+          onHistoryChange={setApiHistory}
+          onOpenHistoryEntry={openApiHistoryEntry}
+          onNewRequest={addApiRequestTab}
+        />
+      );
+    }
+
+    if (isNosqlTab(path)) {
+      return (
+        <NosqlWorkbenchView
+          extensionEnabled={nosqlExtensionEnabled}
+          onOpenExtensions={() => setPanel('extensions')}
+        />
+      );
+    }
+
+    if (isCasfTab(path)) {
+      return (
+        <CasfSessionView
+          onOpenCasfPanel={() => {
+            if (!canUseCasf(edition)) {
+              setSettingsFocus({ category: 'Account', nonce: Date.now() });
+              setPanel('settings');
+              return;
+            }
+            setPanel('casf');
+            setSideBarVisible(true);
+          }}
+        />
+      );
+    }
+
+    const diff = path.startsWith('diff:') ? diffTabs[path] : null;
+    if (diff) {
+      return (
+        <DiffEditorPane
+          path={diff.path}
+          language={pathToLanguage(diff.path)}
+          original={diff.before}
+          modified={diff.after}
+          fontSize={settings.fontSize}
+          theme={editorTheme}
+        />
+      );
+    }
+
+    const content = files[path] ?? '';
+    return (
+      <DocumentPane {...makePaneProps(path, content, (v: string) => setFileContent(path, v))} />
+    );
+  };
+
+  const renderPaneShell = (leaf: EditorLeaf) => (
+    <div className="editor-pane-stack">
+      {splitEnabled && (
+        <TabBar
+          paneChrome
+          openTabs={leaf.tabs}
+          activeTab={leaf.path}
+          dirtyPaths={dirtyPaths}
+          tabLabel={tabLabelFor}
+          onSelect={(p) => handleTabSelect(p, leaf.id)}
+          onClose={(p) => void requestCloseTab(p)}
+          onReorder={(from, to) => {
+            setEditorLayout((root) =>
+              mapLeaf(root, leaf.id, (l) => {
+                if (from < 0 || from >= l.tabs.length || to < 0 || to >= l.tabs.length) return l;
+                const tabs = [...l.tabs];
+                const [moved] = tabs.splice(from, 1);
+                tabs.splice(to, 0, moved!);
+                return { ...l, tabs };
+              }),
+            );
+          }}
+          onSplit={splitEditor}
+          onCloseSplit={closeSplit}
+          splitActive={splitEnabled}
+          integrationToolbar={leaf.id === 'primary' || leaf.id === editorLeaves[0]?.id
+            ? integrationToolbar
+            : undefined}
+          toolbarStart={
+            leaf.id === 'primary' || leaf.id === editorLeaves[0]?.id ? (
+              <NotificationHost inline slackActions={slackNotificationActions} />
+            ) : undefined
+          }
+        />
+      )}
+      <div className="editor-pane-body">{renderWorkbenchPath(leaf.path, leaf.id)}</div>
+    </div>
+  );
+
+  const onBranchSizes = useCallback((branchId: string, firstSize: number, secondSize: number) => {
+    setEditorLayout((root) => setBranchSizes(root, branchId, firstSize, secondSize));
+  }, []);
 
   const reorderTabs = useCallback((fromIndex: number, toIndex: number) => {
     setOpenTabs((tabs) => {
@@ -2464,7 +3041,17 @@ export default function App() {
     });
   }, []);
 
-  const accountStatus = settings.displayName.trim() || settings.pilotUser;
+  const accountStatus =
+    settings.displayName.trim() ||
+    license.licensedEmail ||
+    settings.enterpriseActivationEmail.trim() ||
+    settings.pilotUser;
+  const accountStatusLabel =
+    edition === 'enterprise' && license.status === 'valid'
+      ? `${editionLabel(edition)}${accountStatus ? ` · ${accountStatus}` : ''}`
+      : accountStatus
+        ? `Sign in · ${accountStatus}`
+        : 'Sign in';
 
   const debugBreakpoints = useMemo(() => {
     const out: Record<string, number[]> = {};
@@ -2498,6 +3085,7 @@ export default function App() {
         workspaceOpen={hasWorkspaceOpen}
         quitApp={() => void quitApp()}
         showPanel={showWorkbenchPanel}
+        openAccountSettings={openAccountSettings}
         onSyncExport={exportSettings}
         onSyncImport={() => syncImportRef.current?.click()}
         zoomIn={zoomIn}
@@ -2514,8 +3102,10 @@ export default function App() {
           <code>CODEX_WORKSPACE={activeRoot}</code>
         </div>
       )}
-      <div className="app-body">
-        {settings.activityBarVisible && (
+      <div
+        className={`app-body${settings.activityBarSide === 'right' ? ' app-body--activity-right' : ''}`}
+      >
+        {settings.activityBarVisible && settings.activityBarSide !== 'right' && (
           <Sidebar
             panel={panel}
             sideBarVisible={sideBarVisible}
@@ -2523,6 +3113,9 @@ export default function App() {
             bottomPanelOpen={bottomPanelOpen}
             bottomPanelTab={bottomPanelTab}
             onBottomPanel={toggleBottomPanelTab}
+            apiTabActive={Boolean(focusedEditorPath && isApiTab(focusedEditorPath))}
+            nosqlExtensionEnabled={nosqlExtensionEnabled}
+            nosqlTabActive={Boolean(focusedEditorPath && isNosqlTab(focusedEditorPath))}
           />
         )}
         <SidebarSplit
@@ -2536,7 +3129,7 @@ export default function App() {
               <ExplorerSidePanel
                 openEditorPaths={openTabs}
                 activeEditorPath={activeTab}
-                onActivateEditor={(p) => setActiveTab(p)}
+                onActivateEditor={(p) => assignPathToPane(editorFocus, p)}
                 onCloseEditor={(p) => void requestCloseTab(p)}
                 browserSection={
                   <BrowserPanelCompact
@@ -2628,6 +3221,12 @@ export default function App() {
               />
             )}
             {panel === 'extensions' && <ExtensionsPanel />}
+            {panel === 'casf' && (
+              <CasfPanel
+                onOpenSession={openCasfSession}
+                onOpenAccountSettings={openAccountSettings}
+              />
+            )}
             {panel === 'llm' && <LlmSuitePanel />}
             {slackPanelMounted && isChatIntegrationActive(settings) && (
               <div
@@ -2733,158 +3332,48 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <SettingsPanel onClose={() => setPanel('explorer')} />
+              <SettingsPanel
+                key={
+                  settingsFocus
+                    ? `settings-${settingsFocus.category}-${settingsFocus.nonce}`
+                    : 'settings'
+                }
+                onClose={() => {
+                  setSettingsFocus(null);
+                  setPanel('explorer');
+                }}
+                initialCategory={settingsFocus?.category ?? null}
+              />
             </>
           ) : (
             <>
-          <TabBar
-            openTabs={openTabs}
-            activeTab={editorFocus === 'secondary' && splitTab ? splitTab : activeTab}
-            dirtyPaths={dirtyPaths}
-            tabLabel={(path) =>
-              browserWb.isBrowserTab(path)
-                ? browserWb.tabTitle(path)
-                : isSlackChatTab(path)
-                  ? slackChatTabTitle(slackChatWb.sessionForTab(path), path)
-                  : isMeetingTab(path)
-                    ? meetingTabTitle(meetingWb.sessionForTab(path), path)
-                    : path.split(/[/\\]/).pop() ?? path
-            }
-            onSelect={handleTabSelect}
-            onClose={(path) => void requestCloseTab(path)}
-            onReorder={reorderTabs}
-            onSplit={toggleSplit}
-            splitActive={splitEnabled}
-            integrationToolbar={integrationToolbar}
-            toolbarStart={<NotificationHost inline slackActions={slackNotificationActions} />}
-          />
-          <div className="editor-wrap">
-            {activeMeeting ? (
-              <MeetingTabView
-                session={activeMeeting}
-                onReload={() => meetingWb.reloadTab(activeMeeting.tabId)}
-              />
-            ) : activeSlackChat ? (
-              <SlackChatView
-                session={activeSlackChat}
-                onLoadOlder={
-                  activeSlackChat.nextCursor && slackToken
-                    ? () =>
-                        void slackChatWb.loadOlderForTab(
-                          slackToken,
-                          activeSlackChat.channelId,
-                          activeSlackChat.nextCursor!,
-                        )
-                    : undefined
-                }
-                onOpenSlackWeb={() =>
-                  openSlackWebInBrowser(
-                    slackWebClientUrl(activeSlackChat.teamId, activeSlackChat.channelId),
-                    activeSlackChat.title,
-                  )
-                }
-                onRefresh={
-                  slackToken
-                    ? () =>
-                        void slackChatWb.loadHistoryForTab(
-                          slackToken,
-                          activeSlackChat.channelId,
-                          activeSlackChat.title,
-                          true,
-                        )
-                    : undefined
-                }
-                slackToken={slackToken || undefined}
-                onSend={
-                  slackToken
-                    ? (payload) =>
-                        slackChatWb.sendMessageForTab(
-                          slackToken,
-                          activeSlackChat.channelId,
-                          payload,
-                        )
-                    : undefined
-                }
-                onEditMessage={
-                  slackToken
-                    ? (messageTs, text) =>
-                        slackChatWb.editMessageForTab(
-                          slackToken,
-                          activeSlackChat.channelId,
-                          messageTs,
-                          text,
-                        )
-                    : undefined
-                }
-                onToggleReaction={
-                  slackToken
-                    ? (messageTs, name, remove) =>
-                        slackChatWb.toggleReactionForTab(
-                          slackToken,
-                          activeSlackChat.channelId,
-                          messageTs,
-                          name,
-                          remove,
-                        )
-                    : undefined
-                }
-                onJoinMeeting={openMeetingInTab}
-                onOpenInBrowser={openSlackWebInBrowser}
-              />
-            ) : activeBrowserSession ? (
-              <BrowserView
-                key={activeBrowserSession.id}
-                session={activeBrowserSession}
-                webviewActive
-                bookmarked={browserWb.bookmarks.some((b) => b.url === activeBrowserSession.url)}
-                onNavigate={(url) => browserWb.navigateBrowser(activeBrowserSession.id, url)}
-                onInputChange={(value) => browserWb.patchSession(activeBrowserSession.id, { input: value })}
-                onBack={() => browserWb.goHistory(activeBrowserSession.id, -1)}
-                onForward={() => browserWb.goHistory(activeBrowserSession.id, 1)}
-                onReload={() =>
-                  browserWb.patchSession(activeBrowserSession.id, {
-                    reloadToken: activeBrowserSession.reloadToken + 1,
-                  })
-                }
-                onToggleBookmark={() =>
-                  browserWb.toggleBookmark(activeBrowserSession.url, activeBrowserSession.title)
-                }
-                onToggleDevtools={toggleActiveBrowserDevtools}
-                onOpenFixture={(id) => openBrowserFixture(id)}
-                onOpenExtensions={() => setPanel('extensions')}
-              />
-            ) : activeTab && activeDiff ? (
-              <DiffEditorPane
-                path={activeDiff.path}
-                language={pathToLanguage(activeDiff.path)}
-                original={activeDiff.before}
-                modified={activeDiff.after}
-                fontSize={settings.fontSize}
-                theme={editorTheme}
-              />
-            ) : activeTab ? (
+          {!splitEnabled && (
+            <TabBar
+              openTabs={openTabs}
+              activeTab={activeTab}
+              dirtyPaths={dirtyPaths}
+              tabLabel={tabLabelFor}
+              onSelect={(p) => handleTabSelect(p, 'primary')}
+              onClose={(path) => void requestCloseTab(path)}
+              onReorder={reorderTabs}
+              onSplit={splitEditor}
+              onCloseSplit={closeSplit}
+              splitActive={false}
+              integrationToolbar={integrationToolbar}
+              toolbarStart={<NotificationHost inline slackActions={slackNotificationActions} />}
+            />
+          )}
+          <div className={`editor-wrap${splitEnabled ? ' editor-wrap-split' : ''}`}>
+            {splitEnabled ? (
               <SplitEditorArea
-                split={splitEnabled && Boolean(splitTab ?? activeTab)}
+                layout={editorLayout}
                 focus={editorFocus}
-                onFocusPane={setEditorFocus}
-                onCloseSplit={() => {
-                  setSplitEnabled(false);
-                  setSplitTab(null);
-                }}
-                primary={makePaneProps(activeTab, activeContent, setActiveContent)}
-                secondary={
-                  splitEnabled && secondaryPath
-                    ? makePaneProps(secondaryPath, secondaryContent, setSecondaryContent)
-                    : null
-                }
+                onFocusPane={focusEditorPane}
+                onBranchSizes={onBranchSizes}
+                renderLeaf={renderPaneShell}
               />
             ) : (
-              <WorkspaceWelcome
-                diskMode={mode === 'disk' && hasWorkspaceOpen}
-                recentFolders={recentWorkspacePaths}
-                onOpenRecent={openRecentWorkspace}
-                shortcuts={welcomeShortcuts}
-              />
+              renderWorkbenchPath(activeTab, 'primary')
             )}
           </div>
             </>
@@ -2922,6 +3411,19 @@ export default function App() {
         </div>
         </AuxiliaryBarSplit>
         </SidebarSplit>
+        {settings.activityBarVisible && settings.activityBarSide === 'right' && (
+          <Sidebar
+            panel={panel}
+            sideBarVisible={sideBarVisible}
+            setPanel={showWorkbenchPanel}
+            bottomPanelOpen={bottomPanelOpen}
+            bottomPanelTab={bottomPanelTab}
+            onBottomPanel={toggleBottomPanelTab}
+            apiTabActive={Boolean(focusedEditorPath && isApiTab(focusedEditorPath))}
+            nosqlExtensionEnabled={nosqlExtensionEnabled}
+            nosqlTabActive={Boolean(focusedEditorPath && isNosqlTab(focusedEditorPath))}
+          />
+        )}
       </div>
       {settings.statusBarVisible && (
       <footer className="status-bar">
@@ -2931,7 +3433,19 @@ export default function App() {
         <span className="segment status-azo azo-tag" title={PRODUCT_TAGLINE}>
           {PRODUCT_CODE}
         </span>
-        {accountStatus && <span className="segment">{accountStatus}</span>}
+        <button
+          type="button"
+          className={`segment status-account${edition === 'enterprise' && license.status === 'valid' ? ' ent' : ''}`}
+          title={
+            edition === 'enterprise' && license.status === 'valid'
+              ? 'Account & Enterprise license'
+              : 'Sign in with A-Zing / activate Enterprise seat'
+          }
+          onClick={openAccountSettings}
+        >
+          <span className="codicon codicon-account" aria-hidden />
+          {accountStatusLabel}
+        </button>
         {mode === 'disk' && workspaceRoots.length > 0 && (
           <WorkspaceRootPicker
             roots={workspaceRoots}

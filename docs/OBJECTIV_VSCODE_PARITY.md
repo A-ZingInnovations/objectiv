@@ -114,7 +114,7 @@ Still **not** in Objectiv shell alone: cloud Settings Sync, universal account si
 
 - Desktop spawns **OpenVSCode Server** on the workspace folder (default port **9888**)
 - **Extensions** panel → start / embed / browser; full VS Code extension marketplace
-- Install server: `bash aziai/scripts/install-openvscode-server.sh`
+- Install server: `bash objectiv/scripts/install-openvscode-server.sh`
 
 ## Objective / G1
 

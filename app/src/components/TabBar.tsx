@@ -4,6 +4,8 @@ import IntegrationBrandIcon from './IntegrationBrandIcon';
 import type { IntegrationToolbarAction } from '../integrations/integrationActivity';
 import { isMeetingTab } from '../meetingTab';
 import { isSlackChatTab } from '../slackChat';
+import { isApiTab } from '../apiTesting';
+import { SPLIT_DIRECTION_LABEL, type SplitDirection } from '../splitLayout';
 
 type Props = {
   openTabs: string[];
@@ -13,13 +15,18 @@ type Props = {
   onSelect: (path: string) => void;
   onClose: (path: string) => boolean | void | Promise<boolean | void>;
   onReorder?: (fromIndex: number, toIndex: number) => void;
-  onSplit?: () => void;
+  /** Open a split in the given direction (any tab type). */
+  onSplit?: (direction: SplitDirection) => void;
+  /** Close the editor split. */
+  onCloseSplit?: () => void;
   splitActive?: boolean;
   messagingOpen?: boolean;
   onToggleMessaging?: () => void;
   /** Renders before the messaging toggle (e.g. notifications bell). */
   toolbarStart?: ReactNode;
   integrationToolbar?: IntegrationToolbarAction[];
+  /** Compact pane chrome when this bar sits inside a split group. */
+  paneChrome?: boolean;
 };
 
 type CtxMenu = {
@@ -50,11 +57,13 @@ export default function TabBar({
   onClose,
   onReorder,
   onSplit,
+  onCloseSplit,
   splitActive,
   messagingOpen: _messagingOpen,
   onToggleMessaging: _onToggleMessaging,
   toolbarStart,
   integrationToolbar,
+  paneChrome,
 }: Props) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -80,7 +89,7 @@ export default function TabBar({
   }, [ctx]);
 
   return (
-    <div className="tabs-container">
+    <div className={`tabs-container${paneChrome ? ' tabs-container-pane' : ''}`}>
       <div className="tabs-scroll" role="tablist">
         {openTabs.map((path, index) => {
           const dirty = dirtyPaths?.has(path) ?? false;
@@ -153,6 +162,8 @@ export default function TabBar({
                 <IntegrationBrandIcon brand="slack" size={16} className="tab-icon" />
               ) : isMeetingTab(path) ? (
                 <IntegrationBrandIcon brand="zoom" size={16} className="tab-icon" />
+              ) : isApiTab(path) ? (
+                <span className="codicon codicon-beaker tab-icon" aria-hidden />
               ) : (
                 <FileTypeIcon path={path} className="tab-icon" size="sm" />
               )}
@@ -203,24 +214,38 @@ export default function TabBar({
           style={{ left: ctx.x, top: ctx.y }}
           role="menu"
         >
-          {onSplit && (
+          {onSplit &&
+            (['right', 'left', 'up', 'down'] as SplitDirection[]).map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onSelect(ctx.path);
+                  onSplit(dir);
+                  setCtx(null);
+                }}
+              >
+                {SPLIT_DIRECTION_LABEL[dir]}
+              </button>
+            ))}
+          {splitActive && onCloseSplit && (
             <button
               type="button"
               role="menuitem"
               onClick={() => {
-                onSelect(ctx.path);
-                onSplit();
+                onCloseSplit();
                 setCtx(null);
               }}
             >
-              {splitActive ? 'Close Split' : 'Split Right'}
+              Close Split
             </button>
           )}
           <button
             type="button"
             role="menuitem"
             onClick={() => {
-              onClose(ctx.path);
+              void onClose(ctx.path);
               setCtx(null);
             }}
           >
@@ -239,10 +264,6 @@ export default function TabBar({
                 }
                 setCtx(null);
               })();
-              for (const p of openTabs) {
-                if (p !== ctx.path) onClose(p);
-              }
-              setCtx(null);
             }}
           >
             Close Others

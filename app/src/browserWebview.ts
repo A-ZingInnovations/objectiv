@@ -120,6 +120,8 @@ async function ensureBrowserWindow(
       visible: true,
       focus: isMeetingSession(sessionId),
       skipTaskbar: true,
+      /** Enable Web Inspector / Inspect Element (F12, toolbar, ⌘⌥I). */
+      devtools: true,
       title: isMeetingSession(sessionId) ? 'Meeting' : 'Browser',
       ...(isMeetingSession(sessionId) ? { userAgent: CHROME_UA } : {}),
     });
@@ -170,12 +172,21 @@ export type BrowserWebviewSync = {
   anchor: HTMLElement | null;
 };
 
-/** Toggle Web Inspector on the embedded browser window for a session. */
+/** Toggle Web Inspector (Inspect Element / Console) on the embedded browser window. */
 export async function toggleBrowserDevtools(sessionId: string): Promise<void> {
   if (!isTauriDesktop()) return;
   const label = browserWebviewLabel(sessionId);
   const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('plugin:webview|internal_toggle_devtools', { label });
+  try {
+    await invoke('objectiv_browser_toggle_devtools', { label });
+  } catch (e) {
+    try {
+      await invoke('plugin:webview|internal_toggle_devtools', { label });
+    } catch (e2) {
+      console.error('toggleBrowserDevtools failed', e, e2);
+      throw e2 instanceof Error ? e2 : e;
+    }
+  }
 }
 
 export async function syncBrowserWebview(opts: BrowserWebviewSync): Promise<void> {

@@ -15,12 +15,14 @@ import {
   parseImportedSettings,
   saveSettings,
   type ObjectivSettings,
-} from './aziaiSettings';
+} from './objectivSettings';
 import { themeBaseKind } from './objectivThemes';
 import {
   applyFullWorkbenchLook,
   subscribeMarketplaceRuntime,
 } from './marketplace/runtime';
+import type { ObjectivEdition } from './objectivEdition';
+import { resolveEffectiveEdition, resolveLicenseInfo, type LicenseInfo } from './objectivLicense';
 
 type SettingsContextValue = {
   settings: ObjectivSettings;
@@ -28,6 +30,9 @@ type SettingsContextValue = {
   resetSettings: () => void;
   exportSettings: () => void;
   importSettingsFromText: (text: string) => void;
+  /** Derived from enterpriseLicenseKey (+ optional build env). */
+  edition: ObjectivEdition;
+  license: LicenseInfo;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -120,6 +125,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const license = useMemo(() => resolveLicenseInfo(settings), [settings]);
+  const edition = useMemo(() => resolveEffectiveEdition(settings), [settings]);
+
   const value = useMemo(
     () => ({
       settings,
@@ -127,8 +135,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       resetSettings,
       exportSettings,
       importSettingsFromText,
+      edition,
+      license,
     }),
-    [settings, patchSettings, resetSettings, exportSettings, importSettingsFromText],
+    [
+      settings,
+      patchSettings,
+      resetSettings,
+      exportSettings,
+      importSettingsFromText,
+      edition,
+      license,
+    ],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
@@ -140,5 +158,3 @@ export function useObjectivSettings(): SettingsContextValue {
   return ctx;
 }
 
-/** @deprecated Prefer useObjectivSettings */
-export const useAziaiSettings = useObjectivSettings;

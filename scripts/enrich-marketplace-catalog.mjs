@@ -41,6 +41,12 @@ const HOW = {
     'Open .sql or connection files in the editor; insert snippets from the picker.',
     'Use the integrated terminal for psql/mysql clients against your hosts.',
   ],
+  Viewers: [
+    'Open Objectiv desktop → Activity bar → Extensions.',
+    'Search for this viewer → Install → leave Enabled on.',
+    'Open the matching activity icon or Extensions detail → Open.',
+    'Use the workbench tab for table/JSON browsing of local data.',
+  ],
   Remote: [
     'Open Objectiv desktop; use the integrated terminal for SSH/SFTP/rsync.',
     'Extensions → Install snippet or config packs → Enabled.',
@@ -145,6 +151,10 @@ function aboutText(entry, manifest) {
   if (cat === 'Database' && manifest.kind === 'theme') {
     return `${base} This theme pack changes Objectiv workbench colors for SQL and data tooling sessions.`;
   }
+  if (manifest.kind === 'viewer' || cat === 'Viewers') {
+    const feature = manifest.contributes?.viewer?.feature;
+    return `${base} Viewer extension${feature ? ` (${feature})` : ''}: install and enable to unlock the in-app workbench activity.`;
+  }
   return base;
 }
 
@@ -158,6 +168,14 @@ for (const entry of catalog.entries) {
   const colors =
     cat === 'Themes' || (cat === 'Database' && manifest.kind === 'theme')
       ? themeColors(manifest, pkg)
+      : manifest.kind === 'viewer'
+        ? {
+            sidebar: '#0f2a20',
+            editor: '#0b1f17',
+            editorFg: '#ecfdf5',
+            accent: '#10b981',
+            tab: '#143528',
+          }
       : manifest.kind === 'snippets' || cat === 'Remote' || cat === 'Database'
         ? snippetColors()
         : configColors();
@@ -168,8 +186,14 @@ for (const entry of catalog.entries) {
 
   entry.about = aboutText(entry, manifest);
   entry.howToAccess =
-    HOW[cat] ||
-    (manifest.kind === 'config' ? HOW.Config : manifest.kind === 'snippets' ? HOW.Snippets : HOW.Themes);
+    manifest.kind === 'viewer'
+      ? HOW.Viewers
+      : HOW[cat] ||
+        (manifest.kind === 'config'
+          ? HOW.Config
+          : manifest.kind === 'snippets'
+            ? HOW.Snippets
+            : HOW.Themes);
   entry.screenshots = [shotRel];
 }
 

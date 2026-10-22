@@ -10,6 +10,9 @@ export type ActivityPanel =
   | 'extensions'
   | 'chat'
   | 'browser'
+  | 'api'
+  | 'nosql'
+  | 'casf'
   | 'llm'
   | 'terminal'
   | 'settings'
@@ -44,15 +47,34 @@ export const ACTIVITY_BAR_ITEMS: ActivityBarItem[] = [
   },
   { id: 'chat', codicon: 'comment-discussion', title: 'Objective Agent (⌘⇧A)', section: 'main' },
   { id: 'browser', codicon: 'globe', title: 'Browser (⌘⇧B)', section: 'main' },
+  { id: 'api', codicon: 'beaker', title: 'API Testing — open tab (⌘⇧U)', section: 'main' },
+  {
+    id: 'nosql',
+    codicon: 'database',
+    title: 'NoSQL / Mongo View (requires extension)',
+    section: 'main',
+  },
+  {
+    id: 'casf',
+    codicon: 'organization',
+    title: 'CASF — Code as a Friend (Enterprise)',
+    section: 'main',
+  },
   { id: 'llm', codicon: 'hubot', title: 'LLM Suite (⌘⇧L)', section: 'main' },
   { id: 'problems', codicon: 'warning', title: 'Problems (⌘⇧M)', section: 'bottom' },
   { id: 'terminal', codicon: 'terminal', title: 'Terminal (⌃`)', section: 'bottom' },
   { id: 'settings', codicon: 'settings-gear', title: 'Settings (⌘,)', section: 'bottom' },
 ];
 
-/** Sidebar hosts explorer/search/etc.; terminal, problems, and settings use other chrome. */
+/** Sidebar hosts explorer/search/etc.; terminal, problems, settings, and API/NoSQL (tab-first) use other chrome. */
 export function panelShowsSidebar(panel: ActivityPanel): boolean {
-  return panel !== 'terminal' && panel !== 'problems' && panel !== 'settings';
+  return (
+    panel !== 'terminal' &&
+    panel !== 'problems' &&
+    panel !== 'settings' &&
+    panel !== 'api' &&
+    panel !== 'nosql'
+  );
 }
 
 export function isBottomPanelActivity(panel: ActivityPanel): boolean {
@@ -77,6 +99,12 @@ export function panelTitle(panel: ActivityPanel): string {
       return 'AGENT';
     case 'browser':
       return 'BROWSER';
+    case 'api':
+      return 'API TESTING';
+    case 'nosql':
+      return 'NOSQL / MONGO';
+    case 'casf':
+      return 'CASF';
     case 'llm':
       return 'LLM SUITE';
     case 'messages':

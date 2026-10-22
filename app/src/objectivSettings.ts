@@ -53,7 +53,7 @@ export type ObjectivSettings = {
 
   /** Enterprise JWT / license key (local only; entitlement checked in objectivLicense). */
   enterpriseLicenseKey: string;
-  /** Org id for online activation (e.g. azing). */
+  /** Org id for online activation (from admin / web dashboard). */
   enterpriseLicenseOrgId: string;
   /** Seat email for online activation. */
   enterpriseActivationEmail: string;
@@ -141,8 +141,10 @@ export type ObjectivSettings = {
   // —— Workbench layout ——
   /** VS Code window.zoomLevel (−5…5, step ≈20%). */
   zoomLevel: number;
-  /** Show the left activity bar icons. */
+  /** Show the activity bar icons. */
   activityBarVisible: boolean;
+  /** Activity bar placement (left or right of the workbench). */
+  activityBarSide: 'left' | 'right';
   /** Show the primary side bar (Explorer, Search, …). */
   sideBarVisible: boolean;
   /** Show the bottom panel (Terminal / Problems / Output). */
@@ -185,6 +187,7 @@ export type ObjectivSettings = {
 };
 
 const STORAGE_KEY = 'objectiv-settings-v1';
+;// Pre-Objectiv localStorage key (read once for migration)
 const LEGACY_STORAGE_KEY = 'aziai-settings-v1';
 
 function envSidecar(): string {
@@ -355,7 +358,7 @@ export function defaultSettings(): ObjectivSettings {
     marketplaceCatalogUrl: envMarketplaceCatalogUrl(),
 
     enterpriseLicenseKey: '',
-    enterpriseLicenseOrgId: envOrgWorkspaceTag().toLowerCase() === 'objectiv' ? 'azing' : '',
+    enterpriseLicenseOrgId: '',
     enterpriseActivationEmail: envMailImapUser(),
     enterpriseActivationCode: '',
     orgWorkspaceTag: envOrgWorkspaceTag(),
@@ -415,6 +418,7 @@ export function defaultSettings(): ObjectivSettings {
 
     zoomLevel: 0,
     activityBarVisible: true,
+    activityBarSide: 'left',
     sideBarVisible: true,
     panelVisible: false,
     statusBarVisible: true,
@@ -559,6 +563,11 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
 
     zoomLevel: Math.min(5, Math.max(-5, Math.round(asNum(parsed.zoomLevel, base.zoomLevel)))),
     activityBarVisible: asBool(parsed.activityBarVisible, base.activityBarVisible),
+    activityBarSide: asEnum(
+      parsed.activityBarSide,
+      ['left', 'right'] as const,
+      base.activityBarSide,
+    ),
     sideBarVisible: asBool(parsed.sideBarVisible, base.sideBarVisible),
     panelVisible: asBool(parsed.panelVisible, base.panelVisible),
     statusBarVisible: asBool(parsed.statusBarVisible, base.statusBarVisible),
@@ -643,6 +652,3 @@ export function applyFileSaveTransforms(
   return out;
 }
 
-/** @deprecated Prefer ObjectivSettings / ObjectivTheme */
-export type AziaiSettings = ObjectivSettings;
-export type AziaiTheme = ObjectivTheme;

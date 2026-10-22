@@ -27,3 +27,8 @@ export function canUseMeetingsIntegration(edition: ObjectivEdition): boolean {
 export function canUseFullMarketplace(edition: ObjectivEdition): boolean {
   return edition === 'enterprise';
 }
+
+/** Code as a Friend — live team coding, screenshare tabs, Objectiv Audio. */
+export function canUseCasf(edition: ObjectivEdition): boolean {
+  return edition === 'enterprise';
+}

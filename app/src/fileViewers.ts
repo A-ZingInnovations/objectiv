@@ -2,6 +2,7 @@
 
 export type ViewerKind =
   | 'text'
+  | 'json'
   | 'markdown'
   | 'notebook'
   | 'pdf'
@@ -19,6 +20,7 @@ export function isSqliteDatabasePath(path: string): boolean {
 }
 
 const EXT_VIEWER: Record<string, ViewerKind> = {
+  json: 'json',
   md: 'markdown',
   mdx: 'markdown',
   markdown: 'markdown',

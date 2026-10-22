@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { ActivityPanel } from './activityPanels';
+import type { SplitDirection } from './splitLayout';
 
 type Handlers = {
   showPanel: (p: ActivityPanel) => void;
@@ -7,6 +8,7 @@ type Handlers = {
   openQuickOpen: () => void;
   openFolder: () => void;
   toggleSplit?: () => void;
+  splitEditor?: (direction: SplitDirection) => void;
   toggleTerminalPanel?: () => void;
   openFile?: () => void;
   formatDocument?: () => void;
@@ -183,6 +185,7 @@ export function useWorkbenchKeyboard(handlers: Handlers, enabled = true): void {
           x: 'extensions',
           a: 'chat',
           b: 'browser',
+          u: 'api',
           i: 'messages',
           l: 'llm',
         };

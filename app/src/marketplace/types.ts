@@ -1,6 +1,12 @@
 import type { WorkbenchColorThemeId } from '../objectivThemes';
 
-export type ObjectivAppKind = 'theme' | 'snippets' | 'config' | 'agent-tool' | 'icons';
+export type ObjectivAppKind =
+  | 'theme'
+  | 'snippets'
+  | 'config'
+  | 'agent-tool'
+  | 'icons'
+  | 'viewer';
 
 export type ThemeContribution = {
   workbenchColorTheme?: WorkbenchColorThemeId;
@@ -23,6 +29,13 @@ export type ConfigContribution = {
   wordWrap?: 'off' | 'on';
 };
 
+export type ViewerContribution = {
+  /** Runtime feature id, e.g. mongo-nosql */
+  feature: string;
+  activityTitle?: string;
+  fileExtensions?: string[];
+};
+
 export type ObjectivAppManifest = {
   id: string;
   name: string;
@@ -33,6 +46,7 @@ export type ObjectivAppManifest = {
   contributes?: ThemeContribution & {
     snippets?: SnippetContribution[];
     editor?: ConfigContribution;
+    viewer?: ViewerContribution;
   };
 };
 

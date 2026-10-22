@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ActivityPanel } from '../activityPanels';
 import { PRODUCT_CODE, PRODUCT_NAME, PRODUCT_TAGLINE } from '../branding';
 import { useObjectivSettings } from '../settingsContext';
+import {
+  ENTERPRISE_SSO_BUY_URL,
+  ENTERPRISE_SSO_LOGIN_URL,
+} from '../enterpriseAuth';
 
 export type MenuActions = {
   openFolder: () => void;
@@ -10,6 +14,8 @@ export type MenuActions = {
   closeFolder: () => void;
   quitApp: () => void;
   showPanel: (panel: ActivityPanel) => void;
+  /** Settings → Account (SSO / Enterprise). */
+  openAccountSettings?: () => void;
   onSyncExport: () => void;
   onSyncImport: () => void;
   saveFile?: () => void;
@@ -38,6 +44,10 @@ const VIEW_ITEMS: { panel: ActivityPanel; label: string }[] = [
   { panel: 'run', label: 'Run and Debug' },
   { panel: 'extensions', label: 'Extensions' },
   { panel: 'chat', label: 'Objective Agent' },
+  { panel: 'browser', label: 'Browser' },
+  { panel: 'api', label: 'API Testing' },
+  { panel: 'nosql', label: 'NoSQL / Mongo View' },
+  { panel: 'casf', label: 'CASF — Code as a Friend' },
   { panel: 'llm', label: 'LLM Suite' },
   { panel: 'terminal', label: 'Terminal' },
   { panel: 'settings', label: 'Settings' },
@@ -51,6 +61,7 @@ export default function AppMenuBar({
   closeFolder,
   quitApp,
   showPanel,
+  openAccountSettings,
   onSyncExport,
   onSyncImport,
   workspaceOpen = false,
@@ -82,7 +93,7 @@ export default function AppMenuBar({
 
   if (hidden) return null;
 
-  const accountLabel = settings.displayName.trim() || 'Account';
+  const accountLabel = settings.displayName.trim() || 'Sign in';
 
   function item(
     label: string,
@@ -185,6 +196,20 @@ export default function AppMenuBar({
                         settings.activityBarVisible,
                       )}
                       {item(
+                        'Move Activity Bar Right',
+                        () => patchSettings({ activityBarSide: 'right' }),
+                        false,
+                        undefined,
+                        settings.activityBarSide === 'right',
+                      )}
+                      {item(
+                        'Move Activity Bar Left',
+                        () => patchSettings({ activityBarSide: 'left' }),
+                        false,
+                        undefined,
+                        settings.activityBarSide === 'left',
+                      )}
+                      {item(
                         'Status Bar',
                         () => patchSettings({ statusBarVisible: !settings.statusBarVisible }),
                         false,
@@ -257,12 +282,17 @@ export default function AppMenuBar({
             label: accountLabel,
             body: (
               <>
-                {item('Open Settings…', () => showPanel('settings'))}
-                {item('Use VS Code / Cursor for cloud account…', () => {
-                  void openExternal(
-                    'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
-                  );
-                })}
+                {item('Sign in with A-Zing…', () => void openExternal(ENTERPRISE_SSO_LOGIN_URL))}
+                {item('Buy Enterprise for your team…', () =>
+                  void openExternal(ENTERPRISE_SSO_BUY_URL),
+                )}
+                <div className="menu-dropdown-sep" />
+                {item('Activate Enterprise seat…', () =>
+                  openAccountSettings ? openAccountSettings() : showPanel('settings'),
+                )}
+                {item('Account & License Settings…', () =>
+                  openAccountSettings ? openAccountSettings() : showPanel('settings'),
+                )}
               </>
             ),
           },
@@ -283,7 +313,7 @@ export default function AppMenuBar({
               <>
                 {item('VS Code parity doc', () => {
                   void openExternal(
-                    'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
+                    'https://www.project-objectiv.com/docs/',
                   );
                 })}
                 {item('Objective extension', () => {

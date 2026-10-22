@@ -1,5 +1,5 @@
 import type { ActivityBarItem, ActivityPanel } from '../activityPanels';
-import type { ChatPlatform, MeetingPlatform, ObjectivSettings } from '../aziaiSettings';
+import type { ChatPlatform, MeetingPlatform, ObjectivSettings } from '../objectivSettings';
 import { resolveSlackToken } from './slackToken';
 
 export type IntegrationBrand =

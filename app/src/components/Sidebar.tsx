@@ -18,6 +18,12 @@ type Props = {
   bottomPanelOpen: boolean;
   bottomPanelTab: BottomPanelTab;
   onBottomPanel: (tab: BottomPanelTab) => void;
+  /** API Testing is tab-first — highlight when an API editor tab is focused. */
+  apiTabActive?: boolean;
+  /** NoSQL workbench tab focused. */
+  nosqlTabActive?: boolean;
+  /** Show NoSQL activity icon (extension installed + enabled). */
+  nosqlExtensionEnabled?: boolean;
 };
 
 function mergeMainActivityItems(integrationItems: ActivityBarItem[]): ActivityBarItem[] {
@@ -34,17 +40,34 @@ export default function Sidebar({
   bottomPanelOpen,
   bottomPanelTab,
   onBottomPanel,
+  apiTabActive = false,
+  nosqlTabActive = false,
+  nosqlExtensionEnabled = false,
 }: Props) {
   const { settings } = useObjectivSettings();
-  const main = useMemo(
-    () => mergeMainActivityItems(integrationActivityItems(settings)),
-    [settings.chatPlatform, settings.chatCredential, settings.meetingPlatform, settings.meetingCredential],
-  );
+  const main = useMemo(() => {
+    const items = mergeMainActivityItems(integrationActivityItems(settings));
+    if (nosqlExtensionEnabled) return items;
+    return items.filter((i) => i.id !== 'nosql');
+  }, [
+    settings.chatPlatform,
+    settings.chatCredential,
+    settings.meetingPlatform,
+    settings.meetingCredential,
+    settings.activityBarSide,
+    nosqlExtensionEnabled,
+  ]);
   const bottom = ACTIVITY_BAR_ITEMS.filter((i) => i.section === 'bottom');
 
   const isActive = (id: ActivityPanel) => {
     if (isBottomPanelActivity(id)) {
       return bottomPanelOpen && bottomPanelTab === (id as BottomPanelTab);
+    }
+    if (id === 'api') {
+      return apiTabActive || panel === 'api';
+    }
+    if (id === 'nosql') {
+      return nosqlTabActive || panel === 'nosql';
     }
     // Collapsed side bar → no main activity stays highlighted (VS Code).
     return sideBarVisible && panel === id;
@@ -74,8 +97,10 @@ export default function Sidebar({
     </button>
   );
 
+  const side = settings.activityBarSide === 'right' ? 'right' : 'left';
+
   return (
-    <div className="activity-bar">
+    <div className={`activity-bar activity-bar--${side}`}>
       <div className="activity-bar-main">{main.map(renderItem)}</div>
       <div className="activity-bar-bottom">{bottom.map(renderItem)}</div>
     </div>

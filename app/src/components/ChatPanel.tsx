@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 
 const API_URL =
   import.meta.env.VITE_OBJECTIV_API_URL ||
-  import.meta.env.VITE_AZIAI_API_URL ||
   'http://localhost:8004';
 
 type Message = { role: 'user' | 'assistant'; content: string };

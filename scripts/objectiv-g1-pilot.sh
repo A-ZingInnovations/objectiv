@@ -25,7 +25,7 @@ fi
 
 echo ""
 echo "==> Objectiv Agent leg (manual when LLM up)"
-echo "1. bash $AZIAI/scripts/objectiv-daily.sh && cd $AZIAI/desktop && npm run dev"
+echo "1. bash $OBJECTIV_ROOT/scripts/objectiv-daily.sh && cd $OBJECTIV_ROOT/desktop && npm run dev"
 echo "2. Open Folder → same path as sidecar workspace"
 echo "3. Agent → paste fixtures/g1-canonical/OBJECTIVE.md prompt"
 echo "4. Approve → pilot.txt=WORLD; JSONL has surface=objectiv + human_label"
