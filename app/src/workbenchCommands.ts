@@ -55,6 +55,8 @@ export type WorkbenchActions = {
   openBrowserHtmlPlayground?: () => void;
   reloadBrowserTab?: () => void;
   openAccountSettings?: () => void;
+  openAbout?: () => void;
+  openDocumentation?: () => void;
   openEnterpriseSso?: () => void;
   buyEnterpriseTeam?: () => void;
 };
@@ -106,6 +108,18 @@ export function buildWorkbenchCommands(
       title: 'Activate Enterprise Seat…',
       category: 'Account',
       run: () => actions.openAccountSettings?.(),
+    },
+    {
+      id: 'help.docs',
+      title: 'Open Documentation',
+      category: 'Help',
+      run: () => actions.openDocumentation?.(),
+    },
+    {
+      id: 'help.about',
+      title: 'About Objectiv…',
+      category: 'Help',
+      run: () => actions.openAbout?.(),
     },
     {
       id: 'browser.devtools',

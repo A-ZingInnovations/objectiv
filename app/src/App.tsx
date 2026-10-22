@@ -18,6 +18,9 @@ import LlmSuitePanel from './components/LlmSuitePanel';
 import SettingsPanel from './components/SettingsPanel';
 import NotificationHost from './components/NotificationHost';
 import { PRODUCT_CODE, PRODUCT_NAME, PRODUCT_TAGLINE } from './branding';
+import { HELP_URLS } from './helpUrls';
+import { getAppVersion } from './appVersion';
+import AboutDialog from './components/AboutDialog';
 import WorkspaceWelcome, { type WelcomeShortcut } from './components/WorkspaceWelcome';
 import PlaceholderPanel from './components/PlaceholderPanel';
 import ScmPanel from './components/ScmPanel';
@@ -204,10 +207,6 @@ function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
-const HELP_URLS = {
-  parity: 'https://www.project-objectiv.com/docs/',
-  extension: 'https://github.com/A-ZingInnovations/objective/tree/main/vscode-extension',
-} as const;
 
 function nextUntitled(files: Record<string, string>): string {
   let n = 1;
@@ -228,7 +227,15 @@ export default function App() {
   const [settingsFocus, setSettingsFocus] = useState<{ category: string; nonce: number } | null>(
     null,
   );
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [appVersionLabel, setAppVersionLabel] = useState('');
   const isDesktop = useIsTauriDesktop();
+
+  useEffect(() => {
+    void getAppVersion().then(setAppVersionLabel);
+  }, []);
+
+  const openAbout = useCallback(() => setAboutOpen(true), []);
   const sidecarUrl = settings.sidecarUrl.replace(/\/$/, '');
 
   const [mode, setMode] = useState<WorkspaceMode>('demo');
@@ -1556,8 +1563,18 @@ export default function App() {
       else if (id === 'account_activate' || id === 'account_settings') openAccountSettings();
       else if (id === 'sync_export') exportSettings();
       else if (id === 'sync_import') syncImportRef.current?.click();
-      else if (id === 'help_parity') void openExternal(HELP_URLS.parity);
+      else if (id === 'help_docs') void openExternal(HELP_URLS.docs);
+      else if (id === 'help_getting_started') void openExternal(HELP_URLS.gettingStarted);
+      else if (id === 'help_learn') void openExternal(HELP_URLS.learn);
+      else if (id === 'help_faq') void openExternal(HELP_URLS.faq);
+      else if (id === 'help_release_notes') void openExternal(HELP_URLS.releaseNotes);
+      else if (id === 'help_integrations') void openExternal(HELP_URLS.integrations);
+      else if (id === 'help_teams') void openExternal(HELP_URLS.teams);
+      else if (id === 'help_outlook') void openExternal(HELP_URLS.outlook);
+      else if (id === 'help_enterprise') void openExternal(HELP_URLS.enterprise);
+      else if (id === 'help_marketplace') void openExternal(HELP_URLS.marketplace);
       else if (id === 'help_extension') void openExternal(HELP_URLS.extension);
+      else if (id === 'help_about' || id === 'help_parity') openAbout();
     },
     [
       openFolder,
@@ -1568,6 +1585,7 @@ export default function App() {
       showWorkbenchPanel,
       openSidePanel,
       openAccountSettings,
+      openAbout,
       zoomIn,
       zoomOut,
       zoomReset,
@@ -2564,6 +2582,8 @@ export default function App() {
           openBrowserHtmlPlayground: () => openBrowserFixture('html-playground'),
           reloadBrowserTab: reloadActiveBrowserTab,
           openAccountSettings,
+          openAbout,
+          openDocumentation: () => void openExternal(HELP_URLS.docs),
           openEnterpriseSso: () => void openExternal(ENTERPRISE_SSO_LOGIN_URL),
           buyEnterpriseTeam: () => void openExternal(ENTERPRISE_SSO_BUY_URL),
         },
@@ -2599,6 +2619,7 @@ export default function App() {
       togglePanel,
       toggleFullscreen,
       patchSettings,
+      openAbout,
       saveActiveFile,
       saveAllFiles,
       toggleAutoSave,
@@ -3086,6 +3107,7 @@ export default function App() {
         quitApp={() => void quitApp()}
         showPanel={showWorkbenchPanel}
         openAccountSettings={openAccountSettings}
+        openAbout={openAbout}
         onSyncExport={exportSettings}
         onSyncImport={() => syncImportRef.current?.click()}
         zoomIn={zoomIn}
@@ -3427,9 +3449,15 @@ export default function App() {
       </div>
       {settings.statusBarVisible && (
       <footer className="status-bar">
-        <span className="segment" title={PRODUCT_TAGLINE}>
+        <button
+          type="button"
+          className="segment status-about"
+          title={`${PRODUCT_TAGLINE} — About`}
+          onClick={openAbout}
+        >
           {PRODUCT_NAME}
-        </span>
+          {appVersionLabel ? ` ${appVersionLabel}` : ''}
+        </button>
         <span className="segment status-azo azo-tag" title={PRODUCT_TAGLINE}>
           {PRODUCT_CODE}
         </span>
@@ -3587,6 +3615,7 @@ export default function App() {
           }}
         />
       )}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   );
 }

@@ -194,9 +194,56 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
     let sync_import = MenuItem::with_id(app, "sync_import", "Import Settings…", true, None::<&str>)?;
     let sync = Submenu::with_items(app, "Sync", true, &[&sync_export, &sync_import])?;
 
-    let help_parity = MenuItem::with_id(app, "help_parity", "VS Code Parity Doc", true, None::<&str>)?;
-    let help_ext = MenuItem::with_id(app, "help_extension", "Objective Extension", true, None::<&str>)?;
-    let help = Submenu::with_items(app, "Help", true, &[&help_parity, &help_ext])?;
+    let help_docs = MenuItem::with_id(app, "help_docs", "Documentation", true, None::<&str>)?;
+    let help_start =
+        MenuItem::with_id(app, "help_getting_started", "Getting Started", true, None::<&str>)?;
+    let help_learn = MenuItem::with_id(app, "help_learn", "Learn Guides", true, None::<&str>)?;
+    let help_faq = MenuItem::with_id(app, "help_faq", "FAQ", true, None::<&str>)?;
+    let help_notes =
+        MenuItem::with_id(app, "help_release_notes", "Release Notes", true, None::<&str>)?;
+    let help_sep1 = PredefinedMenuItem::separator(app)?;
+    let help_integrations =
+        MenuItem::with_id(app, "help_integrations", "Integrations", true, None::<&str>)?;
+    let help_teams =
+        MenuItem::with_id(app, "help_teams", "Connect Microsoft Teams…", true, None::<&str>)?;
+    let help_outlook =
+        MenuItem::with_id(app, "help_outlook", "Connect Outlook / M365…", true, None::<&str>)?;
+    let help_enterprise =
+        MenuItem::with_id(app, "help_enterprise", "Enterprise & License", true, None::<&str>)?;
+    let help_sep2 = PredefinedMenuItem::separator(app)?;
+    let help_marketplace =
+        MenuItem::with_id(app, "help_marketplace", "Marketplace", true, None::<&str>)?;
+    let help_ext = MenuItem::with_id(
+        app,
+        "help_extension",
+        "Objective Extension (VS Code)",
+        true,
+        None::<&str>,
+    )?;
+    let help_sep3 = PredefinedMenuItem::separator(app)?;
+    let help_about = MenuItem::with_id(app, "help_about", "About Objectiv…", true, None::<&str>)?;
+    let help = Submenu::with_items(
+        app,
+        "Help",
+        true,
+        &[
+            &help_docs,
+            &help_start,
+            &help_learn,
+            &help_faq,
+            &help_notes,
+            &help_sep1,
+            &help_integrations,
+            &help_teams,
+            &help_outlook,
+            &help_enterprise,
+            &help_sep2,
+            &help_marketplace,
+            &help_ext,
+            &help_sep3,
+            &help_about,
+        ],
+    )?;
 
     Menu::with_items(app, &[&file, &view, &account, &sync, &help])
 }
