@@ -31,7 +31,7 @@ Objectiv **defaults to hosted mode**: the desktop app embeds OpenVSCode from you
 Automated deploy from your Mac (SSH as root):
 
 ```bash
-bash objectiv/deploy/openvscode-vps/deploy-to-a-zing-vps.sh
+bash aziai/deploy/openvscode-vps/deploy-to-a-zing-vps.sh
 ```
    - **Connection token:** same as `OPENVSCODE_CONNECTION_TOKEN` in `.env`
 

@@ -1,6 +1,6 @@
 # Objectiv — product plan (developer portal + agent)
 
-**Objectiv** (**AZO** = A-Zing's Objectiv) is the product. The **Objective** agent runs inside Objectiv.
+**Objectiv** (**AZO** = A-Zing's Objectiv) is the product. Not AZIAI. The **Objective** agent runs inside Objectiv.
 
 **Editions:** [Community vs Enterprise (license-based)](./OBJECTIV_EDITIONS.md) (marketplace, agent on-behalf, mail/meetings).
 

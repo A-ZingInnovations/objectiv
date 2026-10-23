@@ -42,7 +42,7 @@ install_linux_tarball() {
 
 install_darwin_docker_wrapper() {
   echo "Objectiv uses hosted OpenVSCode on the A-Zing VPS by default." >&2
-  echo "Deploy: objectiv/deploy/openvscode-vps/README.md" >&2
+  echo "Deploy: aziai/deploy/openvscode-vps/README.md" >&2
   echo "Or set Settings → OpenVSCode Mode → Local (not recommended on macOS)." >&2
   if ! command -v docker >/dev/null 2>&1; then
     exit 1

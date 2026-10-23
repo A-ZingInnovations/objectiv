@@ -1,5 +1,4 @@
 const TRUST_KEY = 'objectiv-trusted-workspaces-v1';
-// Pre-Objectiv localStorage key (read once for migration)
 const LEGACY_TRUST_KEY = 'aziai-trusted-workspaces-v1';
 
 export function loadTrustedRoots(): string[] {

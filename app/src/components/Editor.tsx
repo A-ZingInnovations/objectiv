@@ -11,7 +11,7 @@ import type {
   LineNumbersSetting,
   RenderWhitespaceSetting,
   WordWrapSetting,
-} from '../objectivSettings';
+} from '../aziaiSettings';
 
 export type EditorSettingsProps = {
   fontSize?: number;

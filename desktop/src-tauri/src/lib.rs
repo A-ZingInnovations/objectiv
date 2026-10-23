@@ -153,97 +153,17 @@ fn build_app_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
         ],
     )?;
 
-    let account_signin = MenuItem::with_id(
-        app,
-        "account_signin",
-        "Sign in with A-Zing…",
-        true,
-        None::<&str>,
-    )?;
-    let account_buy = MenuItem::with_id(
-        app,
-        "account_buy_enterprise",
-        "Buy Enterprise for your team…",
-        true,
-        None::<&str>,
-    )?;
-    let account_sep = PredefinedMenuItem::separator(app)?;
-    let account_activate = MenuItem::with_id(
-        app,
-        "account_activate",
-        "Activate Enterprise seat…",
-        true,
-        None::<&str>,
-    )?;
     let account_settings =
-        MenuItem::with_id(app, "account_settings", "Account & License Settings…", true, None::<&str>)?;
-    let account = Submenu::with_items(
-        app,
-        "Account",
-        true,
-        &[
-            &account_signin,
-            &account_buy,
-            &account_sep,
-            &account_activate,
-            &account_settings,
-        ],
-    )?;
+        MenuItem::with_id(app, "account_settings", "Open Settings…", true, None::<&str>)?;
+    let account = Submenu::with_items(app, "Account", true, &[&account_settings])?;
 
     let sync_export = MenuItem::with_id(app, "sync_export", "Export Settings…", true, None::<&str>)?;
     let sync_import = MenuItem::with_id(app, "sync_import", "Import Settings…", true, None::<&str>)?;
     let sync = Submenu::with_items(app, "Sync", true, &[&sync_export, &sync_import])?;
 
-    let help_docs = MenuItem::with_id(app, "help_docs", "Documentation", true, None::<&str>)?;
-    let help_start =
-        MenuItem::with_id(app, "help_getting_started", "Getting Started", true, None::<&str>)?;
-    let help_learn = MenuItem::with_id(app, "help_learn", "Learn Guides", true, None::<&str>)?;
-    let help_faq = MenuItem::with_id(app, "help_faq", "FAQ", true, None::<&str>)?;
-    let help_notes =
-        MenuItem::with_id(app, "help_release_notes", "Release Notes", true, None::<&str>)?;
-    let help_sep1 = PredefinedMenuItem::separator(app)?;
-    let help_integrations =
-        MenuItem::with_id(app, "help_integrations", "Integrations", true, None::<&str>)?;
-    let help_teams =
-        MenuItem::with_id(app, "help_teams", "Connect Microsoft Teams…", true, None::<&str>)?;
-    let help_outlook =
-        MenuItem::with_id(app, "help_outlook", "Connect Outlook / M365…", true, None::<&str>)?;
-    let help_enterprise =
-        MenuItem::with_id(app, "help_enterprise", "Enterprise & License", true, None::<&str>)?;
-    let help_sep2 = PredefinedMenuItem::separator(app)?;
-    let help_marketplace =
-        MenuItem::with_id(app, "help_marketplace", "Marketplace", true, None::<&str>)?;
-    let help_ext = MenuItem::with_id(
-        app,
-        "help_extension",
-        "Objective Extension (VS Code)",
-        true,
-        None::<&str>,
-    )?;
-    let help_sep3 = PredefinedMenuItem::separator(app)?;
-    let help_about = MenuItem::with_id(app, "help_about", "About Objectiv…", true, None::<&str>)?;
-    let help = Submenu::with_items(
-        app,
-        "Help",
-        true,
-        &[
-            &help_docs,
-            &help_start,
-            &help_learn,
-            &help_faq,
-            &help_notes,
-            &help_sep1,
-            &help_integrations,
-            &help_teams,
-            &help_outlook,
-            &help_enterprise,
-            &help_sep2,
-            &help_marketplace,
-            &help_ext,
-            &help_sep3,
-            &help_about,
-        ],
-    )?;
+    let help_parity = MenuItem::with_id(app, "help_parity", "VS Code Parity Doc", true, None::<&str>)?;
+    let help_ext = MenuItem::with_id(app, "help_extension", "Objective Extension", true, None::<&str>)?;
+    let help = Submenu::with_items(app, "Help", true, &[&help_parity, &help_ext])?;
 
     Menu::with_items(app, &[&file, &view, &account, &sync, &help])
 }
@@ -339,7 +259,6 @@ pub fn run() {
             notebook_kernel::notebook_kernel_shutdown,
             browser_webview::objectiv_browser_navigate,
             browser_webview::objectiv_browser_reload,
-            browser_webview::objectiv_browser_toggle_devtools,
             marketplace::marketplace_apps_dir,
             marketplace::marketplace_list_installed,
             marketplace::marketplace_install,

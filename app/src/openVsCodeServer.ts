@@ -1,4 +1,4 @@
-import type { ObjectivSettings } from './objectivSettings';
+import type { ObjectivSettings } from './aziaiSettings';
 import { isTauriDesktop } from './desktopWorkspace';
 
 function envOpenVsCodeToken(): string {

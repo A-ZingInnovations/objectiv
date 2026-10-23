@@ -9,7 +9,7 @@ import {
 const registered = new Set<string>();
 
 function langIds(monaco: Monaco): string[] {
-  return monaco.languages.getLanguages().map((l: { id: string }) => l.id);
+  return monaco.languages.getLanguages().map((l) => l.id);
 }
 
 export function registerMarketplaceSnippetProviders(monaco: Monaco): () => void {
@@ -19,7 +19,7 @@ export function registerMarketplaceSnippetProviders(monaco: Monaco): () => void 
       registered.add(lang);
       monaco.languages.registerCompletionItemProvider(lang, {
         triggerCharacters: [],
-        provideCompletionItems: (model: { getLanguageId: () => string; getWordUntilPosition: (p: unknown) => { startColumn: number; endColumn: number } }, position: { lineNumber: number }) => {
+        provideCompletionItems: (model, position) => {
           const snippets = marketplaceSnippetsForLanguage(model.getLanguageId());
           if (!snippets.length) return { suggestions: [] };
           const word = model.getWordUntilPosition(position);

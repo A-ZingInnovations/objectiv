@@ -5,7 +5,7 @@ import {
   themeBaseKind,
   type WorkbenchColorThemeId,
 } from '../objectivThemes';
-import type { ObjectivSettings } from '../objectivSettings';
+import type { ObjectivSettings } from '../aziaiSettings';
 import { listInstalledApps } from './store';
 import { MARKETPLACE_CHANGED_EVENT, type ObjectivAppManifest } from './types';
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useObjectivSettings } from '../settingsContext';
-import type { LlmProviderKind } from '../objectivSettings';
+import type { LlmProviderKind } from '../aziaiSettings';
 import {
   SUGGESTED_OLLAMA_MODELS,
   byokListModels,

@@ -1,5 +1,4 @@
 const KEY = 'objectiv-command-recents-v1';
-// Pre-Objectiv localStorage key (read once for migration)
 const LEGACY_KEY = 'aziai-command-recents-v1';
 const MAX = 15;
 

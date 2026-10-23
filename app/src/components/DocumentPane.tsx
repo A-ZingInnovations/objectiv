@@ -1,5 +1,4 @@
 import CodeEditor, { type EditorSettingsProps } from './Editor';
-import JsonViewer from './JsonViewer';
 import MarkdownViewer from './MarkdownViewer';
 import NotebookViewer from './NotebookViewer';
 import PdfViewer from './PdfViewer';
@@ -55,23 +54,6 @@ export default function DocumentPane(props: DocumentPaneProps) {
     formatOnPaste: props.formatOnPaste,
     formatOnType: props.formatOnType,
   };
-
-  if (kind === 'json') {
-    return (
-      <JsonViewer
-        path={props.path}
-        value={props.value}
-        onChange={props.onChange}
-        fontSize={props.fontSize}
-        theme={props.theme}
-        workspaceRoot={props.workspaceRoot}
-        diagnostics={props.diagnostics}
-        tabSize={props.tabSize}
-        insertSpaces={props.insertSpaces}
-        scrollToLine={props.scrollToLine}
-      />
-    );
-  }
 
   if (kind === 'markdown') {
     return (

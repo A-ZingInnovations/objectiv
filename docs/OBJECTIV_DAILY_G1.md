@@ -36,7 +36,7 @@ bash ~/Documents/coding-agent-project/scripts/objective-g1-cross-surface.sh
 **Objectiv manual leg** (after sidecar + LLM up):
 
 ```bash
-bash ~/all-repos/objectiv/scripts/objectiv-g1-pilot.sh
+bash ~/all-repos/aziai/scripts/objectiv-g1-pilot.sh
 ```
 
 Send a G1-style task in Agent → **Approve** once → confirm a new `.jsonl` under the events dir shown in the Agent panel (includes `surface: objectiv` and `human_label`).

@@ -1,4 +1,4 @@
-//! Navigate / reload / inspect embedded browser child webviews.
+//! Navigate / reload embedded browser child webviews (JS API has no navigate yet).
 
 use tauri::{AppHandle, Manager, Url};
 
@@ -24,17 +24,4 @@ pub fn objectiv_browser_reload(app: AppHandle, label: String) -> Result<(), Stri
     browser_webview(&app, &label)?
         .reload()
         .map_err(|e| e.to_string())
-}
-
-/// Toggle Web Inspector (Inspect Element / Elements / Console) on a browser tab webview.
-#[tauri::command]
-pub fn objectiv_browser_toggle_devtools(app: AppHandle, label: String) -> Result<(), String> {
-    let win = browser_webview(&app, &label)?;
-    // tauri crate is built with `devtools`; always allow toggle in Objectiv desktop.
-    if win.is_devtools_open() {
-        win.close_devtools();
-    } else {
-        win.open_devtools();
-    }
-    Ok(())
 }

@@ -95,7 +95,7 @@ Headers: `X-Objective-Pilot-User`, `X-Objective-Surface` (e.g. `objectiv`).
 
 ### 5.1 Settings schema (selected)
 
-Stored as `objectiv-settings-v1` in `localStorage`.
+Stored as `objectiv-settings-v1` in `localStorage` (legacy key `aziai-settings-v1`).
 
 - Connection: `sidecarUrl`, `pilotUser`  
 - Integrations: `chatPlatform`, `chatCredential`, `meetingPlatform`, `meetingCredential`, IMAP/POP fields  
@@ -122,7 +122,7 @@ Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg` into `deskt
 
 ### 5.4 Desktop (Tauri)
 
-- Menu events: `objectiv-menu`  
+- Menu events: `objectiv-menu` (legacy `aziai-menu` migrated)  
 - View → Appearance menu IDs: `view_fullscreen`, `view_toggle_sidebar`, `view_toggle_panel`, `view_toggle_activity_bar`, `view_toggle_status_bar`, `view_toggle_menu_bar`, `view_toggle_centered`, `view_theme_dark` / `view_theme_light`, `view_zoom_*`  
 - Folder/file pickers, PTY, terminal pop-out `WebviewWindow`  
 - Workspace mkdir / rename / delete / reveal; FS watch pool (`notify` + poll) → `WORKSPACE_CHANGED` to UI  
@@ -186,8 +186,8 @@ Labeled pilot export: manifest + S3 raw sessions path (Objectiv / coding-agent s
 | Variable | Use |
 |----------|-----|
 | `VITE_OBJECTIVE_SIDECAR_URL` | Objectiv → sidecar |
-| `VITE_OBJECTIV_API_URL` | Optional FastAPI backend |
-| `OBJECTIV_HOST` / `OBJECTIV_PORT` | Backend bind |
+| `VITE_OBJECTIV_API_URL` | Optional FastAPI backend (legacy `VITE_AZIAI_API_URL`) |
+| `OBJECTIV_HOST` / `OBJECTIV_PORT` | Backend bind (legacy `AZIAI_*`) |
 | `OBJECTIVE_CHAT_PLATFORM` / `OBJECTIVE_CHAT_CREDENTIAL` | Sidecar chat |
 | `OBJECTIVE_CHAT_*_CREDENTIAL` | Per-platform |
 | `OBJECTIVE_SLACK_WEBHOOK` | Legacy Slack live URL |

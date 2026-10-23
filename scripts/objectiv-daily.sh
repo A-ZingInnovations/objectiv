@@ -3,7 +3,7 @@
 # Replaces browser Codex as the day-to-day Objective surface.
 set -euo pipefail
 ROOT="${CODING_AGENT_PROJECT:-$HOME/Documents/coding-agent-project}"
-OBJECTIV_ROOT="${OBJECTIV_REPO:-$HOME/all-repos/objectiv}"
+OBJECTIV_ROOT="${OBJECTIV_REPO:-${AZIAI_REPO:-$HOME/all-repos/objectiv}}"
 WORKSPACE="${CODEX_WORKSPACE:-$ROOT}"
 SIDECAR="${VITE_OBJECTIVE_SIDECAR_URL:-http://127.0.0.1:8787}"
 

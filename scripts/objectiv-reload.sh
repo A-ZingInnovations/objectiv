@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop → rebuild web + Rust → launch Tauri dev. Always rebuild (no stale native/UI).
 set -euo pipefail
-OBJECTIV_REPO="${OBJECTIV_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
+OBJECTIV_REPO="${OBJECTIV_REPO:-${AZIAI_REPO:-$(cd "$(dirname "$0")/.." && pwd)}}"
 
 bash "$OBJECTIV_REPO/scripts/objectiv-stop-all.sh"
 

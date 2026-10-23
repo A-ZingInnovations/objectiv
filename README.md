@@ -1,8 +1,8 @@
 # Objectiv
 
-**Repo path:** `~/all-repos/objectiv`
+**Repo path:** `~/all-repos/objectiv` (legacy folder name was `aziai`; GitHub remote may still be `A-ZingInnovations/aziai`).
 
-**Objectiv** is the product name. **AZO** = **A-Zing's Objectiv**. The **Objective** agent runs inside Objectiv.
+**Objectiv** is the product name. **AZO** = **A-Zing's Objectiv**. Do not brand the app as AZIAI.
 
 ## Structure
 

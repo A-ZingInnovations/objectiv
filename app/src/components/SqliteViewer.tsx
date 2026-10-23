@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import initSqlJs, { type Database, type SqlValue } from 'sql.js';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
 import { displayPath } from '../workspaceDisk';
-import { fileBaseName, uint8ToArrayBuffer } from '../fileViewers';
+import { uint8ToArrayBuffer } from '../fileViewers';
 
 type ColumnInfo = {
   cid: number;
@@ -12,16 +12,12 @@ type ColumnInfo = {
   pk: number;
 };
 
-type DbObjectKind = 'table' | 'view';
-
 type Props = {
   path: string;
   data: Uint8Array;
   onDirty?: () => void;
   onPersist?: (data: Uint8Array) => Promise<void>;
 };
-
-type ContentTab = 'data' | 'properties';
 
 const PAGE_SIZE = 150;
 
@@ -60,63 +56,33 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tables, setTables] = useState<string[]>([]);
-  const [views, setViews] = useState<string[]>([]);
   const [activeTable, setActiveTable] = useState('');
-  const [activeKind, setActiveKind] = useState<DbObjectKind>('table');
-  const [openTabs, setOpenTabs] = useState<{ name: string; kind: DbObjectKind }[]>([]);
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [rows, setRows] = useState<Record<string, SqlValue>[]>([]);
   const [page, setPage] = useState(0);
   const [rowCount, setRowCount] = useState(0);
   const [selectedRowids, setSelectedRowids] = useState<Set<number>>(() => new Set());
-  const [sqlText, setSqlText] = useState('SELECT * FROM sqlite_master LIMIT 20;');
+  const [showSql, setShowSql] = useState(false);
+  const [sqlText, setSqlText] = useState('SELECT 1;');
   const [sqlMessage, setSqlMessage] = useState<string | null>(null);
   const [sqlRows, setSqlRows] = useState<Record<string, SqlValue>[]>([]);
   const [sqlColumns, setSqlColumns] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  /** Pending in-cell text before blur commit (key: `${rowid}:${column}`). */
   const [cellDrafts, setCellDrafts] = useState<Record<string, string>>({});
-  const [navTablesOpen, setNavTablesOpen] = useState(true);
-  const [navViewsOpen, setNavViewsOpen] = useState(true);
-  const [contentTab, setContentTab] = useState<ContentTab>('data');
-  const [filterText, setFilterText] = useState('');
-  const [sqlPanelOpen, setSqlPanelOpen] = useState(true);
-
-  const dbLabel = fileBaseName(displayPath(path)) || 'database';
-  const editable = activeKind === 'table';
 
   const markDirty = useCallback(() => {
     onDirty?.();
   }, [onDirty]);
 
-  const loadCatalog = useCallback((db: Database) => {
-    const tableRes = db.exec(
+  const loadTables = useCallback((db: Database) => {
+    const res = db.exec(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
     );
-    const viewRes = db.exec(
-      `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
-    );
-    const tableNames =
-      tableRes[0]?.values.map((row: SqlValue[]) => String(row[0] ?? '')).filter(Boolean) ?? [];
-    const viewNames =
-      viewRes[0]?.values.map((row: SqlValue[]) => String(row[0] ?? '')).filter(Boolean) ?? [];
-    setTables(tableNames);
-    setViews(viewNames);
-    setActiveTable((prev) => {
-      if (prev && (tableNames.includes(prev) || viewNames.includes(prev))) return prev;
-      return tableNames[0] ?? viewNames[0] ?? '';
-    });
-    setOpenTabs((prev) => {
-      if (prev.length) {
-        return prev.filter(
-          (t) =>
-            (t.kind === 'table' && tableNames.includes(t.name)) ||
-            (t.kind === 'view' && viewNames.includes(t.name)),
-        );
-      }
-      const first = tableNames[0] ?? viewNames[0];
-      if (!first) return [];
-      return [{ name: first, kind: tableNames.includes(first) ? 'table' : 'view' }];
-    });
+    const names =
+      res[0]?.values.map((row) => String(row[0] ?? '')).filter(Boolean) ?? [];
+    setTables(names);
+    setActiveTable((prev) => (prev && names.includes(prev) ? prev : names[0] ?? ''));
   }, []);
 
   const openDatabase = useCallback(async () => {
@@ -128,15 +94,14 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
       const SQL = await getSqlJs();
       const db = new SQL.Database(new Uint8Array(uint8ToArrayBuffer(data)));
       dbRef.current = db;
-      loadCatalog(db);
+      loadTables(db);
       setReady(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setTables([]);
-      setViews([]);
       setActiveTable('');
     }
-  }, [data, loadCatalog]);
+  }, [data, loadTables]);
 
   useEffect(() => {
     void openDatabase();
@@ -146,39 +111,8 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
     };
   }, [openDatabase, path]);
 
-  const openObject = useCallback((name: string, kind: DbObjectKind) => {
-    setActiveTable(name);
-    setActiveKind(kind);
-    setContentTab('data');
-    setFilterText('');
-    setOpenTabs((prev) => {
-      if (prev.some((t) => t.name === name && t.kind === kind)) return prev;
-      return [...prev, { name, kind }];
-    });
-    setSqlText(`SELECT * FROM ${quoteIdent(name)} LIMIT 100;`);
-  }, []);
-
-  const closeTab = useCallback(
-    (name: string, kind: DbObjectKind) => {
-      setOpenTabs((prev) => {
-        const next = prev.filter((t) => !(t.name === name && t.kind === kind));
-        if (activeTable === name && activeKind === kind) {
-          const fallback = next[next.length - 1];
-          if (fallback) {
-            setActiveTable(fallback.name);
-            setActiveKind(fallback.kind);
-          } else {
-            setActiveTable('');
-          }
-        }
-        return next;
-      });
-    },
-    [activeKind, activeTable],
-  );
-
   const loadTablePage = useCallback(
-    (table: string, kind: DbObjectKind, pageIndex: number, filter: string) => {
+    (table: string, pageIndex: number) => {
       const db = dbRef.current;
       if (!db || !table) {
         setColumns([]);
@@ -189,7 +123,7 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
       try {
         const info = db.exec(`PRAGMA table_info(${quoteIdent(table)})`);
         const cols: ColumnInfo[] =
-          info[0]?.values.map((row: SqlValue[]) => ({
+          info[0]?.values.map((row) => ({
             cid: Number(row[0]),
             name: String(row[1] ?? ''),
             type: String(row[2] ?? ''),
@@ -198,60 +132,29 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
           })) ?? [];
         setColumns(cols);
 
-        const where = filter.trim()
-          ? ` WHERE CAST(rowid AS TEXT) LIKE '%' || ? || '%' OR ${cols
-              .map((c) => `CAST(${quoteIdent(c.name)} AS TEXT) LIKE '%' || ? || '%'`)
-              .join(' OR ')}`
-          : '';
-        const filterParams = filter.trim()
-          ? Array.from({ length: 1 + cols.length }, () => filter.trim())
-          : [];
-
-        let total = 0;
-        if (kind === 'table') {
-          const countStmt = db.prepare(
-            `SELECT COUNT(*) AS c FROM ${quoteIdent(table)}${where}`,
-          );
-          if (filterParams.length) countStmt.bind(filterParams);
-          if (countStmt.step()) total = Number(countStmt.getAsObject().c ?? 0);
-          countStmt.free();
-        } else {
-          const countRes = db.exec(`SELECT COUNT(*) AS c FROM ${quoteIdent(table)}`);
-          total = Number(countRes[0]?.values[0]?.[0] ?? 0);
-        }
+        const countRes = db.exec(`SELECT COUNT(*) AS c FROM ${quoteIdent(table)}`);
+        const total = Number(countRes[0]?.values[0]?.[0] ?? 0);
         setRowCount(total);
 
         const offset = pageIndex * PAGE_SIZE;
-        if (kind === 'table') {
-          const q = `SELECT rowid AS __rowid__, * FROM ${quoteIdent(table)}${where} LIMIT ${PAGE_SIZE} OFFSET ${offset}`;
-          const stmt = db.prepare(q);
-          if (filterParams.length) stmt.bind(filterParams);
-          const loaded: Record<string, SqlValue>[] = [];
-          while (stmt.step()) loaded.push(stmt.getAsObject() as Record<string, SqlValue>);
-          stmt.free();
-          setRows(loaded);
-        } else {
-          const dataRes = db.exec(
-            `SELECT * FROM ${quoteIdent(table)} LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
-          );
-          if (!dataRes[0]) {
-            setRows([]);
-          } else {
-            const names = dataRes[0].columns;
-            setRows(
-              dataRes[0].values.map((vals: SqlValue[], idx: number) => {
-                const rec: Record<string, SqlValue> = { __rowid__: offset + idx };
-                names.forEach((n: string, i: number) => {
-                  rec[n] = vals[i] as SqlValue;
-                });
-                return rec;
-              }),
-            );
-          }
+        const q = `SELECT rowid AS __rowid__, * FROM ${quoteIdent(table)} LIMIT ${PAGE_SIZE} OFFSET ${offset}`;
+        const dataRes = db.exec(q);
+        if (!dataRes[0]) {
+          setRows([]);
+          setSelectedRowids(new Set());
+          return;
         }
+        const names = dataRes[0].columns;
+        const loaded = dataRes[0].values.map((vals) => {
+          const rec: Record<string, SqlValue> = {};
+          names.forEach((n, i) => {
+            rec[n] = vals[i] as SqlValue;
+          });
+          return rec;
+        });
+        setRows(loaded);
         setSelectedRowids(new Set());
         setCellDrafts({});
-        setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -260,24 +163,12 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
   );
 
   useEffect(() => {
-    if (!activeTable) return;
-    if (tables.includes(activeTable)) setActiveKind('table');
-    else if (views.includes(activeTable)) setActiveKind('view');
-  }, [activeTable, tables, views]);
-
-  useEffect(() => {
     setPage(0);
-  }, [activeTable, activeKind, filterText]);
+  }, [activeTable]);
 
   useEffect(() => {
-    if (ready && activeTable) loadTablePage(activeTable, activeKind, page, filterText);
-  }, [ready, activeTable, activeKind, page, filterText, loadTablePage]);
-
-  useEffect(() => {
-    if (ready && activeTable && openTabs.length === 0) {
-      setOpenTabs([{ name: activeTable, kind: activeKind }]);
-    }
-  }, [ready, activeTable, activeKind, openTabs.length]);
+    if (ready && activeTable) loadTablePage(activeTable, page);
+  }, [ready, activeTable, page, loadTablePage]);
 
   const displayColumns = useMemo(
     () => columns.map((c) => c.name).filter((n) => n !== '__rowid__'),
@@ -298,7 +189,7 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
   const commitCellEdit = useCallback(
     (rowid: number, column: string, raw: string) => {
       const db = dbRef.current;
-      if (!db || !activeTable || !editable) return;
+      if (!db || !activeTable) return;
       const key = cellDraftKey(rowid, column);
       const row = rows.find((r) => Number(r.__rowid__) === rowid);
       if (!row) return;
@@ -322,10 +213,7 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
 
       const value = parseCellInput(raw, colMeta?.type ?? 'TEXT');
       try {
-        db.run(`UPDATE ${quoteIdent(activeTable)} SET ${quoteIdent(column)} = ? WHERE rowid = ?`, [
-          value,
-          rowid,
-        ]);
+        db.run(`UPDATE ${quoteIdent(activeTable)} SET ${quoteIdent(column)} = ? WHERE rowid = ?`, [value, rowid]);
         markDirty();
         setRows((prev) =>
           prev.map((r) => (Number(r.__rowid__) === rowid ? { ...r, [column]: value } : r)),
@@ -341,12 +229,12 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
         setError(e instanceof Error ? e.message : String(e));
       }
     },
-    [activeTable, cellDrafts, columns, editable, markDirty, rows],
+    [activeTable, cellDrafts, columns, markDirty, rows],
   );
 
   const addRow = useCallback(() => {
     const db = dbRef.current;
-    if (!db || !activeTable || !editable || columns.length === 0) return;
+    if (!db || !activeTable || columns.length === 0) return;
     const names = columns.map((c) => c.name);
     const placeholders = names.map(() => '?').join(', ');
     const values: SqlValue[] = names.map(() => null);
@@ -358,25 +246,25 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
       markDirty();
       const lastPage = Math.max(0, Math.ceil((rowCount + 1) / PAGE_SIZE) - 1);
       setPage(lastPage);
-      loadTablePage(activeTable, activeKind, lastPage, filterText);
+      loadTablePage(activeTable, lastPage);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [activeKind, activeTable, columns, editable, filterText, loadTablePage, markDirty, rowCount]);
+  }, [activeTable, columns, loadTablePage, markDirty, rowCount]);
 
   const deleteSelected = useCallback(() => {
     const db = dbRef.current;
-    if (!db || !activeTable || !editable || selectedRowids.size === 0) return;
+    if (!db || !activeTable || selectedRowids.size === 0) return;
     try {
       for (const rowid of selectedRowids) {
         db.run(`DELETE FROM ${quoteIdent(activeTable)} WHERE rowid = ?`, [rowid]);
       }
       markDirty();
-      loadTablePage(activeTable, activeKind, page, filterText);
+      loadTablePage(activeTable, page);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [activeKind, activeTable, editable, filterText, loadTablePage, markDirty, page, selectedRowids]);
+  }, [activeTable, loadTablePage, markDirty, page, selectedRowids]);
 
   const runSql = useCallback(() => {
     const db = dbRef.current;
@@ -388,39 +276,34 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
     if (!text) return;
     try {
       const upper = text.replace(/^\s+/u, '').toUpperCase();
-      const isSelect =
-        upper.startsWith('SELECT') || upper.startsWith('WITH') || upper.startsWith('PRAGMA');
+      const isSelect = upper.startsWith('SELECT') || upper.startsWith('WITH') || upper.startsWith('PRAGMA');
       if (isSelect) {
         const res = db.exec(text);
         if (res[0]) {
           setSqlColumns(res[0].columns);
-          const loaded = res[0].values.map((vals: SqlValue[]) => {
+          const loaded = res[0].values.map((vals) => {
             const rec: Record<string, SqlValue> = {};
-            res[0].columns.forEach((n: string, i: number) => {
+            res[0].columns.forEach((n, i) => {
               rec[n] = vals[i] as SqlValue;
             });
             return rec;
           });
           setSqlRows(loaded.slice(0, 500));
-          setSqlMessage(
-            loaded.length > 500
-              ? `Showing first 500 of ${loaded.length} rows`
-              : `${loaded.length} row(s)`,
-          );
+          setSqlMessage(loaded.length > 500 ? `Showing first 500 of ${loaded.length} rows` : `${loaded.length} row(s)`);
         } else {
           setSqlMessage('Query returned no rows');
         }
       } else {
         db.run(text);
         markDirty();
-        loadCatalog(db);
-        if (activeTable) loadTablePage(activeTable, activeKind, page, filterText);
+        loadTables(db);
+        if (activeTable) loadTablePage(activeTable, page);
         setSqlMessage('Statement executed');
       }
     } catch (e) {
       setSqlMessage(e instanceof Error ? e.message : String(e));
     }
-  }, [activeKind, activeTable, filterText, loadCatalog, loadTablePage, markDirty, page, sqlText]);
+  }, [activeTable, loadTablePage, loadTables, markDirty, page, sqlText]);
 
   const handleSave = useCallback(async () => {
     const db = dbRef.current;
@@ -475,353 +358,164 @@ export default function SqliteViewer({ path, data, onDirty, onPersist }: Props) 
   }
 
   return (
-    <div className="doc-viewer sqlite-viewer dbeaver-viewer">
-      <div className="dbeaver-topbar">
-        <span className="codicon codicon-database" aria-hidden />
-        <span className="dbeaver-topbar-title">{dbLabel}</span>
-        <span className="dbeaver-topbar-path" title={displayPath(path)}>
-          {displayPath(path)}
-        </span>
-        <span className="doc-viewer-sep" />
-        <button
-          type="button"
-          className="doc-viewer-action"
-          onClick={() => activeTable && loadTablePage(activeTable, activeKind, page, filterText)}
-          disabled={!activeTable}
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          className="doc-viewer-action"
-          onClick={() => void handleSave()}
-          disabled={!onPersist || saving}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button
-          type="button"
-          className={`doc-viewer-action ${sqlPanelOpen ? 'active' : ''}`}
-          onClick={() => setSqlPanelOpen((s) => !s)}
-        >
-          SQL Editor
-        </button>
-      </div>
-
-      <div className="sqlite-viewer-layout dbeaver-layout">
-        <aside className="dbeaver-nav" aria-label="Database navigator">
-          <div className="dbeaver-nav-conn">
-            <span className="codicon codicon-server-environment" aria-hidden />
-            <span className="dbeaver-nav-conn-name">{dbLabel}</span>
-            <span className="dbeaver-nav-conn-badge">SQLite</span>
-          </div>
-
-          <button
-            type="button"
-            className="dbeaver-nav-folder"
-            onClick={() => setNavTablesOpen((o) => !o)}
-          >
-            <span className={`codicon codicon-chevron-${navTablesOpen ? 'down' : 'right'}`} />
-            <span className="codicon codicon-folder" aria-hidden />
-            Tables
-            <span className="dbeaver-nav-count">{tables.length}</span>
-          </button>
-          {navTablesOpen &&
-            tables.map((t) => (
-              <button
-                key={`t-${t}`}
-                type="button"
-                className={`dbeaver-nav-item ${activeTable === t && activeKind === 'table' ? 'active' : ''}`}
-                onClick={() => openObject(t, 'table')}
-                onDoubleClick={() => {
-                  openObject(t, 'table');
-                  setSqlText(`SELECT * FROM ${quoteIdent(t)} LIMIT 100;`);
-                }}
-              >
-                <span className="codicon codicon-table" aria-hidden />
-                {t}
-              </button>
-            ))}
-          {navTablesOpen && tables.length === 0 && (
-            <div className="sqlite-table-empty">No tables</div>
-          )}
-
-          <button
-            type="button"
-            className="dbeaver-nav-folder"
-            onClick={() => setNavViewsOpen((o) => !o)}
-          >
-            <span className={`codicon codicon-chevron-${navViewsOpen ? 'down' : 'right'}`} />
-            <span className="codicon codicon-folder" aria-hidden />
-            Views
-            <span className="dbeaver-nav-count">{views.length}</span>
-          </button>
-          {navViewsOpen &&
-            views.map((v) => (
-              <button
-                key={`v-${v}`}
-                type="button"
-                className={`dbeaver-nav-item ${activeTable === v && activeKind === 'view' ? 'active' : ''}`}
-                onClick={() => openObject(v, 'view')}
-              >
-                <span className="codicon codicon-eye" aria-hidden />
-                {v}
-              </button>
-            ))}
-          {navViewsOpen && views.length === 0 && (
-            <div className="sqlite-table-empty">No views</div>
-          )}
+    <div className="doc-viewer sqlite-viewer">
+      <div className="sqlite-viewer-layout">
+        <aside className="sqlite-table-list" aria-label="Tables">
+          {tables.length === 0 && <div className="sqlite-table-empty">No tables</div>}
+          {tables.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`sqlite-table-item ${t === activeTable ? 'active' : ''}`}
+              onClick={() => setActiveTable(t)}
+            >
+              <span className="codicon codicon-table" aria-hidden />
+              {t}
+            </button>
+          ))}
         </aside>
-
-        <div className="sqlite-main dbeaver-main">
-          <div className="dbeaver-object-tabs" role="tablist" aria-label="Open objects">
-            {openTabs.map((t) => (
-              <div
-                key={`${t.kind}:${t.name}`}
-                className={`dbeaver-object-tab ${activeTable === t.name && activeKind === t.kind ? 'active' : ''}`}
-              >
-                <button
-                  type="button"
-                  className="dbeaver-object-tab-label"
-                  onClick={() => openObject(t.name, t.kind)}
-                >
-                  <span
-                    className={`codicon codicon-${t.kind === 'view' ? 'eye' : 'table'}`}
-                    aria-hidden
-                  />
-                  {t.name}
+        <div className="sqlite-main">
+          <div className="doc-viewer-toolbar sqlite-toolbar">
+            <span className="doc-viewer-meta">{displayPath(path)}</span>
+            <span className="doc-viewer-sep" />
+            <button type="button" className="doc-viewer-action" onClick={() => loadTablePage(activeTable, page)} disabled={!activeTable}>
+              Refresh
+            </button>
+            <button type="button" className="doc-viewer-action" onClick={() => void handleSave()} disabled={!onPersist || saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="doc-viewer-action" onClick={addRow} disabled={!activeTable}>
+              Add row
+            </button>
+            <button
+              type="button"
+              className="doc-viewer-action"
+              onClick={deleteSelected}
+              disabled={!activeTable || selectedRowids.size === 0}
+            >
+              Delete selected
+            </button>
+            <button type="button" className={`doc-viewer-action ${showSql ? 'active' : ''}`} onClick={() => setShowSql((s) => !s)}>
+              SQL
+            </button>
+            {activeTable && (
+              <>
+                <span className="doc-viewer-sep" />
+                <span className="doc-viewer-meta">
+                  {activeTable} · {rowCount} row{rowCount === 1 ? '' : 's'} · edit inline (Enter or leave cell saves)
+                </span>
+                <button type="button" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
+                  Prev
                 </button>
-                <button
-                  type="button"
-                  className="dbeaver-object-tab-close"
-                  aria-label={`Close ${t.name}`}
-                  onClick={() => closeTab(t.name, t.kind)}
-                >
-                  <span className="codicon codicon-close" aria-hidden />
+                <span className="doc-viewer-meta">
+                  Page {page + 1} / {pageCount}
+                </span>
+                <button type="button" disabled={page >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>
+                  Next
                 </button>
-              </div>
-            ))}
-            {openTabs.length === 0 && (
-              <span className="dbeaver-object-tabs-empty">Open a table from the navigator</span>
+              </>
             )}
           </div>
 
-          {activeTable && (
-            <div className="dbeaver-subtabs" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={contentTab === 'data'}
-                className={`dbeaver-subtab ${contentTab === 'data' ? 'active' : ''}`}
-                onClick={() => setContentTab('data')}
-              >
-                Data
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={contentTab === 'properties'}
-                className={`dbeaver-subtab ${contentTab === 'properties' ? 'active' : ''}`}
-                onClick={() => setContentTab('properties')}
-              >
-                Properties
-              </button>
-            </div>
-          )}
-
-          {contentTab === 'data' && activeTable && (
-            <div className="dbeaver-data-toolbar">
-              <input
-                className="dbeaver-filter"
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                placeholder={editable ? 'Filter rows…' : 'Filter (tables only)'}
-                disabled={!editable}
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                className="doc-viewer-action"
-                onClick={addRow}
-                disabled={!editable}
-                title={editable ? 'Insert row' : 'Views are read-only'}
-              >
-                Add row
-              </button>
-              <button
-                type="button"
-                className="doc-viewer-action"
-                onClick={deleteSelected}
-                disabled={!editable || selectedRowids.size === 0}
-              >
-                Delete
-              </button>
-              <span className="doc-viewer-sep" />
-              <button type="button" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
-                Prev
-              </button>
-              <span className="doc-viewer-meta">
-                {rowCount} row{rowCount === 1 ? '' : 's'} · page {page + 1}/{pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={page >= pageCount - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </button>
-            </div>
-          )}
-
           {error && <div className="doc-viewer-error sqlite-inline-error">{error}</div>}
 
-          {contentTab === 'properties' && activeTable ? (
-            <div className="excel-viewer-table-wrap dbeaver-props-wrap">
-              <table className="excel-viewer-table dbeaver-props-table">
+          <div className="excel-viewer-table-wrap sqlite-grid-wrap">
+            {activeTable && displayColumns.length > 0 ? (
+              <table className="excel-viewer-table sqlite-grid">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Column</th>
-                    <th>Type</th>
-                    <th>Not null</th>
-                    <th>PK</th>
+                    <th className="sqlite-select-col" />
+                    {displayColumns.map((col) => (
+                      <th key={col}>{col}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {columns.map((c) => (
-                    <tr key={c.name}>
-                      <td>{c.cid}</td>
-                      <td>{c.name}</td>
-                      <td>{c.type || '—'}</td>
-                      <td>{c.notnull ? 'YES' : ''}</td>
-                      <td>{c.pk ? c.pk : ''}</td>
-                    </tr>
-                  ))}
+                  {rows.map((row) => {
+                    const rowid = Number(row.__rowid__);
+                    const checked = selectedRowids.has(rowid);
+                    return (
+                      <tr key={rowid}>
+                        <td className="sqlite-select-col">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            aria-label={`Select row ${rowid}`}
+                            onChange={() => {
+                              setSelectedRowids((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(rowid)) next.delete(rowid);
+                                else next.add(rowid);
+                                return next;
+                              });
+                            }}
+                          />
+                        </td>
+                        {displayColumns.map((col) => {
+                          const isBlob = row[col] instanceof Uint8Array;
+                          const text = displayCellText(row, rowid, col);
+                          return (
+                            <td key={col} className="sqlite-cell">
+                              {isBlob ? (
+                                <span className="sqlite-cell-readonly">{text}</span>
+                              ) : (
+                                <input
+                                  type="text"
+                                  className="sqlite-cell-input"
+                                  value={text}
+                                  aria-label={`${col}, row ${rowid}`}
+                                  onChange={(e) => {
+                                    const key = cellDraftKey(rowid, col);
+                                    setCellDrafts((d) => ({ ...d, [key]: e.target.value }));
+                                  }}
+                                  onBlur={(e) => commitCellEdit(rowid, col, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      const key = cellDraftKey(rowid, col);
+                                      setCellDrafts((d) => {
+                                        if (!(key in d)) return d;
+                                        const next = { ...d };
+                                        delete next[key];
+                                        return next;
+                                      });
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                />
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            </div>
-          ) : (
-            <div className="excel-viewer-table-wrap sqlite-grid-wrap">
-              {activeTable && displayColumns.length > 0 ? (
-                <table className="excel-viewer-table sqlite-grid">
-                  <thead>
-                    <tr>
-                      {editable && <th className="sqlite-select-col" />}
-                      {displayColumns.map((col) => {
-                        const meta = columns.find((c) => c.name === col);
-                        return (
-                          <th key={col}>
-                            <span className="dbeaver-col-name">
-                              {col}
-                              {meta?.pk ? (
-                                <span className="codicon codicon-key dbeaver-pk" aria-label="PK" />
-                              ) : null}
-                            </span>
-                            <span className="dbeaver-col-type">{meta?.type || 'ANY'}</span>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => {
-                      const rowid = Number(row.__rowid__);
-                      const checked = selectedRowids.has(rowid);
-                      return (
-                        <tr key={rowid}>
-                          {editable && (
-                            <td className="sqlite-select-col">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                aria-label={`Select row ${rowid}`}
-                                onChange={() => {
-                                  setSelectedRowids((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(rowid)) next.delete(rowid);
-                                    else next.add(rowid);
-                                    return next;
-                                  });
-                                }}
-                              />
-                            </td>
-                          )}
-                          {displayColumns.map((col) => {
-                            const isBlob = row[col] instanceof Uint8Array;
-                            const text = displayCellText(row, rowid, col);
-                            return (
-                              <td key={col} className="sqlite-cell">
-                                {!editable || isBlob ? (
-                                  <span className="sqlite-cell-readonly">{text}</span>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    className="sqlite-cell-input"
-                                    value={text}
-                                    aria-label={`${col}, row ${rowid}`}
-                                    onChange={(e) => {
-                                      const key = cellDraftKey(rowid, col);
-                                      setCellDrafts((d) => ({ ...d, [key]: e.target.value }));
-                                    }}
-                                    onBlur={(e) => commitCellEdit(rowid, col, e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        (e.target as HTMLInputElement).blur();
-                                      }
-                                      if (e.key === 'Escape') {
-                                        const key = cellDraftKey(rowid, col);
-                                        setCellDrafts((d) => {
-                                          if (!(key in d)) return d;
-                                          const next = { ...d };
-                                          delete next[key];
-                                          return next;
-                                        });
-                                        (e.target as HTMLInputElement).blur();
-                                      }
-                                    }}
-                                  />
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="doc-viewer-placeholder">
-                  Select a table or view in the Database Navigator
-                </div>
-              )}
-            </div>
-          )}
+            ) : (
+              <div className="doc-viewer-placeholder">Select a table to browse and edit rows</div>
+            )}
+          </div>
 
-          {sqlPanelOpen && (
-            <div className="sqlite-sql-panel dbeaver-sql">
-              <div className="dbeaver-sql-head">
-                <span className="codicon codicon-terminal" aria-hidden />
-                SQL Editor
-                <button type="button" className="doc-viewer-action" onClick={runSql}>
-                  Execute
-                </button>
-                {sqlMessage && <span className="doc-viewer-meta">{sqlMessage}</span>}
-              </div>
+          {showSql && (
+            <div className="sqlite-sql-panel">
               <textarea
                 className="sqlite-sql-input"
                 value={sqlText}
                 onChange={(e) => setSqlText(e.target.value)}
                 spellCheck={false}
                 rows={4}
-                placeholder="SELECT * FROM …;"
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    runSql();
-                  }
-                }}
+                placeholder="SELECT * FROM …;  INSERT / UPDATE / DELETE also supported"
               />
+              <div className="sqlite-sql-actions">
+                <button type="button" className="doc-viewer-action" onClick={runSql}>
+                  Run
+                </button>
+                {sqlMessage && <span className="doc-viewer-meta">{sqlMessage}</span>}
+              </div>
               {sqlColumns.length > 0 && (
                 <div className="excel-viewer-table-wrap sqlite-sql-results">
                   <table className="excel-viewer-table">
