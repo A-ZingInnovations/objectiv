@@ -9,8 +9,8 @@ App.tsx renders panels inline; every activity-bar icon now renders its real pane
 | Stats | LiveStatsPanel | Wired |
 | Agent Execution | AgentExecutionDashboardShell + 6 modules | Wired |
 | Explorer | ExplorerSidePanel | Wired (was broken — onOpenFolder not destructured, crashed at runtime) |
-| Search | SearchPanel | Wired (onOpenFolder, onRefreshExplorer wired) |
-| SCM | ScmPanel | Wired (onOpenFolder wired) |
+| Search | SearchPanel | Wired (onOpenFolder, onRefreshExplorer, replace preview wired) |
+| SCM | ScmPanel | Wired (onOpenFolder wired; inline diff viewer added) |
 | Run and Debug | RunPanel | Wired (onOpenFolder wired) |
 | Testing | TestingPanel | Wired (now rendered; was missing entirely — fell to placeholder) |
 | Extensions | ExtensionsPanel | Wired |
@@ -19,11 +19,25 @@ App.tsx renders panels inline; every activity-bar icon now renders its real pane
 | Chat | ChatPanel | Wired |
 | Browser | BrowserPanel | Wired |
 | LLM Suite | LlmSuitePanel | Wired |
-| Problems | ProblemsPanel | Wired |
-| Terminal | TerminalPanel | Wired |
+| Problems | ProblemsPanel | Wired (severity filters added) |
+| Terminal | TerminalPanel | Wired (split panes added) |
 | Settings | SettingsPanel | Wired |
 | Meetings | MessagingPanel | Wired |
 | Everything else | PlaceholderPanel | Wired |
+
+Default visible icons: **7** (Explorer, Search, SCM, Run, Testing, Extensions, Objective Agent).
+
+## Sidebar gap fixes (feature/2026-11-26-sidebar-modules)
+
+| Gap | Status | File |
+|-----|--------|------|
+| 7 default visible icons (added Objective Agent) | ✅ Done | app/src/activityPanels.ts, app/src/objectivSettings.ts |
+| Activity bar toggle (right-click show/hide) | ✅ Done | app/src/components/Sidebar.tsx |
+| SCM inline diff viewer (Working Tree vs HEAD) | ✅ Done | app/src/components/ScmPanel.tsx, app/src/index.css |
+| Search replace preview (before/after diff) | ✅ Done | app/src/components/SearchPanel.tsx |
+| Terminal split panes (horizontal/vertical) | ✅ Done | app/src/components/XtermTerminal.tsx |
+| Problems severity filters (All/Error/Warning/Info) | ✅ Done | app/src/components/ProblemsPanel.tsx |
+| SCM diff click-to-open fix | ✅ Done | app/src/components/ScmPanel.tsx, app/src/App.tsx |
 
 ## Build & test state
 
