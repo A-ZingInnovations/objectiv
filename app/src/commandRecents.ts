@@ -1,5 +1,5 @@
 const KEY = 'objectiv-command-recents-v1';
-const LEGACY_KEY = 'aziai-command-recents-v1';
+const LEGACY_KEY = 'objectiv-legacy-command-recents-v1';
 const MAX = 15;
 
 export function loadCommandRecents(): string[] {

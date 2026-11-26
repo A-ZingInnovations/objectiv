@@ -24,6 +24,6 @@ export function applyZoomLevel(level: number): void {
   const root = document.documentElement;
   root.style.setProperty('--objectiv-zoom', String(factor));
   root.dataset.zoomLevel = String(clamped);
-  // CSS zoom is supported in Chromium and modern WebKit (Tauri).
+  // CSS zoom is supported in Chromium and modern WebKit (Electron).
   (root.style as CSSStyleDeclaration & { zoom?: string }).zoom = String(factor);
 }

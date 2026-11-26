@@ -7,7 +7,7 @@ type Props = {
   onCancel: () => void;
 };
 
-/** Compact in-app prompt (web dev only — desktop uses native Tauri dialog). */
+/** Compact in-app prompt (web dev only — desktop uses the native Electron dialog). */
 export default function UnsavedChangesDialog({ fileName, onSave, onDiscard, onCancel }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -43,6 +43,18 @@ Community keeps **read-only chat sync**. Mail, meetings, and agent **on-behalf**
 | Catalog | `community` tier entries | Full catalog |
 | Install cap | e.g. 10 extensions | Unlimited |
 
+### Professional network (org services)
+
+Requires a valid **Enterprise** license and reachability to org-hosted endpoints (A-Zing professional network / unified-agent ingest—not the public internet copy on the marketing site).
+
+| Feature | Community | Enterprise |
+|---------|-----------|------------|
+| **Billion Context (`bili`)** — LLM request tracking & long-horizon BYOK proxy | No | Yes |
+| **SCM vulnerability scans** (npm/pip audit in Source Control) | No | Yes |
+| Central **bili** ingest (`/v1/bili/events`) | No | Yes (when configured) |
+
+Community still gets **LLM Suite** chat, Ollama, BYOK, Voice, and **Test Explorer** locally—without billion-context routing or org vulnerability pipelines.
+
 Catalog flag (future): `"tier": "community" | "enterprise"` per entry.
 
 ## Implementation phases

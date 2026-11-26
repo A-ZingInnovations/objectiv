@@ -1,55 +1,43 @@
-import { useEffect, useState } from 'react';
-import {
-  debugLaunchNode,
-  debugLaunchPython,
-  debugStop,
-  isTauriDesktop,
-  readWorkspaceFile,
-  runShellInWorkspace,
-  scanWorkspace,
-} from '../desktopWorkspace';
-import { detectDockerArtifacts, dockerTasksFromArtifacts } from '../dockerTasks';
-import {
-  isNodeDebugLaunch,
-  isPythonDebugLaunch,
-  shellCommandForLaunch,
-  type LaunchConfiguration,
-  type LaunchFile,
-} from '../launchConfig';
-import {
-  detectPythonArtifacts,
-  pythonTasksFromArtifacts,
-  syntheticPythonLaunchConfigs,
-} from '../pythonTasks';
-import { mergeTasks, tasksFromPackageJson, type WorkspaceTask } from '../workspaceTasks';
-import { appendOutput, setOutput as setGlobalOutput } from '../outputChannel';
+import {useEffect, useState} from 'react';
+import {debugLaunchNode, debugLaunchPython, debugStop, isElectronDesktop, readWorkspaceFile, runShellInWorkspace, scanWorkspace} from '../desktopWorkspace';
+import {detectDockerArtifacts, dockerTasksFromArtifacts} from '../dockerTasks';
+import {isNodeDebugLaunch, isPythonDebugLaunch, shellCommandForLaunch, type LaunchConfiguration, type LaunchFile} from '../launchConfig';
+import {detectPythonArtifacts, pythonTasksFromArtifacts, syntheticPythonLaunchConfigs} from '../pythonTasks';
+import {detectWorkspaceTestArtifacts, mergeWorkspaceTestTasks, pubspecLooksFlutter} from '../languageTests';
+import {mergeTasks, tasksFromPackageJson, type WorkspaceTask} from '../workspaceTasks';
+import {appendOutput, setOutput as setGlobalOutput} from '../outputChannel';
+import SideBarOpenFolderHint from './SideBarOpenFolderHint';
 
 type Props = {
   workspaceRoot: string | null;
   activePath?: string | null;
   breakpoints?: Record<string, number[]>;
+  onOpenFolder?: () => void;
 };
 
 export default function RunPanel({
   workspaceRoot,
   activePath = null,
   breakpoints = {},
+  onOpenFolder,
 }: Props) {
   const [configs, setConfigs] = useState<LaunchConfiguration[]>([]);
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [dockerTasks, setDockerTasks] = useState<WorkspaceTask[]>([]);
   const [pythonTasks, setPythonTasks] = useState<WorkspaceTask[]>([]);
+  const [workspaceTests, setWorkspaceTests] = useState<WorkspaceTask[]>([]);
   const [output, setOutput] = useState('');
   const [busy, setBusy] = useState(false);
   const [lastCommand, setLastCommand] = useState('');
   const [debugging, setDebugging] = useState(false);
 
   useEffect(() => {
-    if (!workspaceRoot || !isTauriDesktop()) {
+    if (!workspaceRoot || !isElectronDesktop()) {
       setConfigs([]);
       setTasks([]);
       setDockerTasks([]);
       setPythonTasks([]);
+      setWorkspaceTests([]);
       return;
     }
     void (async () => {
@@ -87,6 +75,19 @@ export default function RunPanel({
 
       const pyArt = detectPythonArtifacts(files);
       setPythonTasks(pythonTasksFromArtifacts(pyArt));
+
+      let pubspecFlutter = false;
+      try {
+        const pubspec = await readWorkspaceFile(workspaceRoot, 'pubspec.yaml');
+        pubspecFlutter = pubspecLooksFlutter(pubspec);
+      } catch {
+        pubspecFlutter = false;
+      }
+      const wsTestArt = detectWorkspaceTestArtifacts(files, { pubspecHasFlutter: pubspecFlutter });
+      const npmTests = packageTasks.filter((t) => t.group === 'test');
+      setWorkspaceTests(
+        mergeWorkspaceTestTasks(pyArt, wsTestArt, npmTests, hasCargo),
+      );
 
       const hasPythonLaunch = launchConfigs.some(
         (c) =>
@@ -189,18 +190,19 @@ export default function RunPanel({
   }
 
   const buildTasks = tasks.filter((t) => t.group === 'build');
-  const testTasks = tasks.filter((t) => t.group === 'test');
-  const otherTasks = tasks.filter((t) => t.group !== 'build' && t.group !== 'test');
+  const otherTasks = tasks.filter(
+    (t) => t.group !== 'build' && t.group !== 'test',
+  );
   const dockerBuild = dockerTasks.filter((t) => t.group === 'build');
   const dockerRun = dockerTasks.filter((t) => t.group !== 'build');
-  const pyTest = pythonTasks.filter((t) => t.group === 'test');
-  const pyOther = pythonTasks.filter((t) => t.group !== 'test');
+  const pyOther = pythonTasks;
   const empty =
     workspaceRoot &&
     configs.length === 0 &&
     tasks.length === 0 &&
     dockerTasks.length === 0 &&
-    pythonTasks.length === 0;
+    pythonTasks.length === 0 &&
+    workspaceTests.length === 0;
 
   function taskIcon(t: WorkspaceTask): string {
     if (t.group === 'test') return 'beaker';
@@ -212,12 +214,37 @@ export default function RunPanel({
     <>
       <div className="side-bar-title">RUN AND DEBUG</div>
       <div className="side-bar-placeholder">
-        {!workspaceRoot && <p className="side-bar-placeholder-hint">Open folder…</p>}
-        {workspaceRoot && tasks.length > 0 && (
+        {!workspaceRoot &&
+          (onOpenFolder ? (
+            <SideBarOpenFolderHint onOpenFolder={onOpenFolder} />
+          ) : (
+            <p className="side-bar-placeholder-hint">Open folder…</p>
+          ))}
+        {workspaceRoot && workspaceTests.length > 0 && (
+          <>
+            <p className="run-section-label">Tests</p>
+            <ul className="run-list">
+              {workspaceTests.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    className="run-list-btn"
+                    disabled={busy}
+                    onClick={() => void runShell(t.command)}
+                  >
+                    <span className="codicon codicon-beaker" aria-hidden />
+                    {t.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {workspaceRoot && (buildTasks.length > 0 || otherTasks.length > 0) && (
           <>
             <p className="run-section-label">Tasks</p>
             <ul className="run-list">
-              {[...testTasks, ...buildTasks, ...otherTasks].map((t) => (
+              {[...buildTasks, ...otherTasks].map((t) => (
                 <li key={t.id}>
                   <button
                     type="button"
@@ -233,11 +260,11 @@ export default function RunPanel({
             </ul>
           </>
         )}
-        {workspaceRoot && pythonTasks.length > 0 && (
+        {workspaceRoot && pyOther.length > 0 && (
           <>
             <p className="run-section-label">Python</p>
             <ul className="run-list">
-              {[...pyTest, ...pyOther].map((t) => (
+              {pyOther.map((t) => (
                 <li key={t.id}>
                   <button
                     type="button"
@@ -245,10 +272,7 @@ export default function RunPanel({
                     disabled={busy}
                     onClick={() => void runShell(t.command)}
                   >
-                    <span
-                      className={`codicon codicon-${t.group === 'test' ? 'beaker' : 'symbol-method'}`}
-                      aria-hidden
-                    />
+                    <span className="codicon codicon-symbol-method" aria-hidden />
                     {t.label}
                   </button>
                 </li>
@@ -281,7 +305,7 @@ export default function RunPanel({
         )}
         {empty && (
           <p className="side-bar-placeholder-hint">
-            No tasks, Python/Docker files, or .vscode/launch.json
+            No tests, tasks, Python/Docker files, or .vscode/launch.json
           </p>
         )}
         {configs.length > 0 && <p className="run-section-label">Launch</p>}

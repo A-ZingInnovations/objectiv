@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import type { SlackChatSession } from '../slackChat';
-import { fetchSlackUsers, type SlackComposerPayload, type SlackUserRef } from '../integrations/slackLive';
-import {
-  SLACK_EMOJI_QUICK,
-  insertAtCursor,
-  slackifyMentions,
-  wrapSelection,
-} from '../integrations/slackComposer';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {fetchSlackUsers, type SlackComposerPayload, type SlackUserRef} from '../integrations/slackLive';
+import {SLACK_EMOJI_QUICK, insertAtCursor, slackifyMentions, wrapSelection} from '../integrations/slackComposer';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {nativeInvoke} from '../desktopBridge';
 
 type Props = {
   session: SlackChatSession;
@@ -26,7 +22,7 @@ export default function SlackChatComposer({ session, slackToken, onSend }: Props
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!slackToken || !isTauriDesktop()) return;
+    if (!slackToken || !isElectronDesktop()) return;
     void fetchSlackUsers(slackToken)
       .then(setUsers)
       .catch(() => setUsers([]));
@@ -99,13 +95,14 @@ export default function SlackChatComposer({ session, slackToken, onSend }: Props
   );
 
   const attachFiles = useCallback(async () => {
-    if (!isTauriDesktop()) return;
+    if (!isElectronDesktop()) return;
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const picked = await open({ multiple: true });
-      if (!picked) return;
-      const paths = Array.isArray(picked) ? picked : [picked];
-      setPendingFiles((prev) => [...prev, ...paths.filter((p) => typeof p === 'string')]);
+      const picked = await nativeInvoke<string[] | null>('dialog_open_files', {
+        title: 'Attach files',
+        multiple: true,
+      });
+      if (!picked || picked.length === 0) return;
+      setPendingFiles((prev) => [...prev, ...picked.filter((p) => typeof p === 'string')]);
     } catch {
       /* ignore */
     }

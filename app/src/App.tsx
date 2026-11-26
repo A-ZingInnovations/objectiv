@@ -14,7 +14,12 @@ import OutputPanel from './components/OutputPanel';
 import XtermTerminal from './components/XtermTerminal';
 import RunPanel from './components/RunPanel';
 import ExtensionsPanel from './components/ExtensionsPanel';
+import TestingPanel from './components/TestingPanel';
+import OutlineView from './components/OutlineView';
+import DevContainersPanel from './components/DevContainersPanel';
 import LlmSuitePanel from './components/LlmSuitePanel';
+import LiveStatsPanel from './components/LiveStatsPanel';
+import { AgentExecutionDashboardShell } from './components/agentExecution/AgentExecutionDashboardShell';
 import SettingsPanel from './components/SettingsPanel';
 import NotificationHost from './components/NotificationHost';
 import { PRODUCT_CODE, PRODUCT_NAME, PRODUCT_TAGLINE } from './branding';
@@ -86,11 +91,11 @@ import { browserFixtureUrl, type BrowserFixtureId } from './browserPages';
 import { toggleBrowserDevtools } from './browserWebview';
 import type { PendingEdit } from './types';
 import type { ActivityPanel } from './activityPanels';
-import { ACTIVITY_BAR_ITEMS, panelShowsSidebar } from './activityPanels';
+import { ACTIVITY_BAR_ITEMS, panelShowsSidebar, getVisibleActivityBarItems } from './activityPanels';
 import { pathToLanguage } from './workspace';
 import {
   applyFileSaveTransforms,
-} from './aziaiSettings';
+} from './objectivSettings';
 import {
   base64ToUint8Array,
   isBinaryViewer,
@@ -145,7 +150,7 @@ import {
   listenTerminalPopoutEvents,
   openTerminalPopout,
 } from './terminalPopout';
-import { loadSettings } from './aziaiSettings';
+import { loadSettings } from './objectivSettings';
 import {
   clampZoomLevel,
   ZOOM_LEVEL_DEFAULT,
@@ -157,7 +162,7 @@ function shellQuote(s: string): string {
 }
 
 const HELP_URLS = {
-  parity: 'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
+  parity: 'https://github.com/A-ZingInnovations/objectiv/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
   extension: 'https://github.com/A-ZingInnovations/objective/tree/main/vscode-extension',
 } as const;
 
@@ -526,36 +531,6 @@ export default function App() {
     setOpenTabs((t) => (t.includes(id) ? t : [...t, id]));
     setActiveTab(id);
   }, []);
-
-  const openGitDiff = useCallback(
-    async (relPath: string) => {
-      if (!activeRoot || !isTauriDesktop()) return;
-      try {
-        const after = await readWorkspaceFile(activeRoot, relPath);
-        let before = '';
-        try {
-          before = await runShellInWorkspace(
-            activeRoot,
-            `git show HEAD:${relPath.replace(/'/g, `'\\''`)}`,
-          );
-        } catch {
-          before = '';
-        }
-        const path = encodeDiskPath(activeRootIndex, relPath);
-        openDiffTab({
-          callId: `git:${relPath}`,
-          tool: 'git-diff',
-          path,
-          title: relPath,
-          before,
-          after,
-        });
-      } catch {
-        /* ignore */
-      }
-    },
-    [activeRoot, activeRootIndex, openDiffTab],
-  );
 
   const writePathToDisk = useCallback(
     async (path: string): Promise<boolean> => {
@@ -1161,8 +1136,8 @@ export default function App() {
 
   const quitApp = useCallback(async () => {
     if (isTauriDesktop()) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
+      const { nativeInvoke } = await import('./desktopBridge');
+      await nativeInvoke('window_close_current');
     } else {
       window.close();
     }
@@ -1182,9 +1157,8 @@ export default function App() {
 
   const toggleFullscreen = useCallback(async () => {
     if (isTauriDesktop()) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const win = getCurrentWindow();
-      await win.setFullscreen(!(await win.isFullscreen()));
+      const { nativeInvoke } = await import('./desktopBridge');
+      await nativeInvoke('window_toggle_fullscreen');
       return;
     }
     if (!document.fullscreenElement) {
@@ -1272,10 +1246,10 @@ export default function App() {
     if (!isDesktop) return;
     let unlisten: (() => void) | undefined;
     void (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      unlisten = await listen<string>('objectiv-menu', (e) => {
-        console.info('[objectiv] menu', e.payload);
-        handleMenuId(e.payload);
+      const { nativeListen } = await import('./desktopBridge');
+      unlisten = await nativeListen<string>('objectiv-menu', (payload) => {
+        console.info('[objectiv] menu', payload);
+        handleMenuId(payload);
       });
     })();
     return () => unlisten?.();
@@ -1789,8 +1763,8 @@ export default function App() {
         console.warn('workspace_watch_sync failed', e);
       }
       try {
-        const { listen } = await import('@tauri-apps/api/event');
-        unlisten = await listen(WORKSPACE_CHANGED_EVENT, () => {
+        const { nativeListen } = await import('./desktopBridge');
+        unlisten = await nativeListen(WORKSPACE_CHANGED_EVENT, () => {
           void syncExplorer();
         });
       } catch (e) {
@@ -2177,6 +2151,7 @@ export default function App() {
       buildWorkbenchCommands(
         {
           openFolder: () => void openFolder(),
+          cloneRepository: () => void cloneRepository(),
           closeFolder,
           quitApp: () => void quitApp(),
           showPanel: showWorkbenchPanel,
@@ -2194,6 +2169,9 @@ export default function App() {
           newFile: addFile,
           addFolderToWorkspace: () => void addFolderToWorkspace(),
           toggleSplit,
+          splitLeft: toggleSplit,
+          splitDown: toggleSplit,
+          splitUp: toggleSplit,
           runWorkspaceTest,
           runWorkspaceBuild,
           runDockerComposeUp,
@@ -2492,6 +2470,7 @@ export default function App() {
       <AppMenuBar
         hidden={isTauriDesktop() || !settings.menuBarVisible}
         openFolder={() => void openFolder()}
+        cloneRepository={() => void cloneRepository()}
         openFile={() => void openFilePicker()}
         addFolderToWorkspace={() => void addFolderToWorkspace()}
         closeFolder={closeFolder}
@@ -2523,6 +2502,10 @@ export default function App() {
             bottomPanelOpen={bottomPanelOpen}
             bottomPanelTab={bottomPanelTab}
             onBottomPanel={toggleBottomPanelTab}
+            visibleItems={getVisibleActivityBarItems(
+              ACTIVITY_BAR_ITEMS,
+              settings.activityBarItems,
+            )}
           />
         )}
         <SidebarSplit
@@ -2601,6 +2584,8 @@ export default function App() {
                 workspaceRoot={activeRoot}
                 workspaceFileRels={workspaceFileRels}
                 scopeFolder={searchScopeFolder}
+                onOpenFolder={() => void openFolder()}
+                onRefreshExplorer={() => void refreshTree()}
                 onQuickOpen={() => {
                   setPaletteMode('files');
                   setPaletteOpen(true);
@@ -2617,7 +2602,7 @@ export default function App() {
                 workspaceRoot={activeRoot}
                 onRefresh={() => void refreshGit()}
                 onOpenFile={(rel) => void openFile(encodeDiskPath(activeRootIndex, rel))}
-                onOpenGitDiff={(rel) => void openGitDiff(rel)}
+                onOpenFolder={() => void openFolder()}
               />
             )}
             {panel === 'run' && (
@@ -2625,10 +2610,25 @@ export default function App() {
                 workspaceRoot={activeRoot}
                 activePath={activeTab}
                 breakpoints={debugBreakpoints}
+                onOpenFolder={() => void openFolder()}
               />
             )}
+            {panel === 'testing' && (
+              <TestingPanel
+                workspaceRoot={activeRoot}
+                onOpenFolder={() => void openFolder()}
+              />
+            )}
+            {panel === 'outline' && (
+              <OutlineView workspaceRoot={activeRoot ?? null} path={activeTab ?? null} />
+            )}
+            {panel === 'devcontainers' && <DevContainersPanel />}
             {panel === 'extensions' && <ExtensionsPanel />}
             {panel === 'llm' && <LlmSuitePanel />}
+            {panel === 'stats' && <LiveStatsPanel workspaceRoot={activeRoot ?? null} />}
+            {panel === 'agent-execution' && (
+              <AgentExecutionDashboardShell activeProjectId={activeRoot ?? undefined} />
+            )}
             {slackPanelMounted && isChatIntegrationActive(settings) && (
               <div
                 className={

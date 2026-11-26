@@ -180,6 +180,7 @@ export function useWorkbenchKeyboard(handlers: Handlers, enabled = true): void {
           f: 'search',
           g: 'scm',
           d: 'run',
+          t: 'testing',
           x: 'extensions',
           a: 'chat',
           b: 'browser',

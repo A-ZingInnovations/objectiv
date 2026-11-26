@@ -4,9 +4,8 @@ app/dist/
 app/.env.local
 app/.env.production.local
 app/tsconfig.tsbuildinfo
-desktop/node_modules/
-desktop/src-tauri/target/
-desktop/src-tauri/gen/
+electron/dist/
+electron/node_modules/
 backend/__pycache__/
 backend/.venv/
 *.pyc

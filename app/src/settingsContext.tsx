@@ -15,7 +15,7 @@ import {
   parseImportedSettings,
   saveSettings,
   type ObjectivSettings,
-} from './aziaiSettings';
+} from './objectivSettings';
 import { themeBaseKind } from './objectivThemes';
 import {
   applyFullWorkbenchLook,

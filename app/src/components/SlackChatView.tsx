@@ -1,23 +1,17 @@
-import { useRef, useEffect, useMemo, useState, useCallback } from 'react';
+import {useRef, useEffect, useMemo, useState, useCallback} from 'react';
 import type { SlackChatSession } from '../slackChat';
 import type { SlackComposerPayload } from '../integrations/slackLive';
 import SlackChatComposer from './SlackChatComposer';
-import {
-  authorHue,
-  authorInitials,
-  formatMessageDayLabel,
-  formatMessageTime,
-  type ChatMessage,
-} from '../integrations/messagingHistory';
+import {authorHue, authorInitials, formatMessageDayLabel, formatMessageTime, type ChatMessage} from '../integrations/messagingHistory';
 import SlackChatMessageBody from './SlackChatMessageBody';
 import SlackMessageAttachments from './SlackMessageAttachments';
 import MeetingJoinCard from './MeetingJoinCard';
-import { extractMeetingLinks } from '../integrations/meetingLinks';
-import { isAutoAttachmentSummary } from '../integrations/slackMessageFormat';
-import { fetchSlackSelf, fetchSlackUsers } from '../integrations/slackLive';
-import { humanizeMentions, slackifyMentions } from '../integrations/slackComposer';
-import { isSlackMessageEditable, type SlackSelf } from '../integrations/slackMessageEdit';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {extractMeetingLinks} from '../integrations/meetingLinks';
+import {isAutoAttachmentSummary} from '../integrations/slackMessageFormat';
+import {fetchSlackSelf, fetchSlackUsers} from '../integrations/slackLive';
+import {humanizeMentions, slackifyMentions} from '../integrations/slackComposer';
+import {isSlackMessageEditable, type SlackSelf} from '../integrations/slackMessageEdit';
+import {isElectronDesktop} from '../desktopWorkspace';
 import SlackSyncDot, { type SlackSyncVisual } from './SlackSyncDot';
 import SlackMessageReactions from './SlackMessageReactions';
 
@@ -77,7 +71,7 @@ export default function SlackChatView({
   const [editDraft, setEditDraft] = useState('');
 
   useEffect(() => {
-    if (!slackToken || !isTauriDesktop()) return;
+    if (!slackToken || !isElectronDesktop()) return;
     void fetchSlackSelf(slackToken)
       .then(setSelfUser)
       .catch(() => setSelfUser(null));

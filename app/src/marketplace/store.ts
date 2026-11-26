@@ -1,11 +1,6 @@
-import { isTauriDesktop } from '../desktopWorkspace';
-import {
-  emitMarketplaceChanged,
-  parseManifestJson,
-  type InstalledMarketplaceApp,
-  type ObjectivAppManifest,
-  type ObjectivAppPackage,
-} from './types';
+import {nativeInvoke} from '../desktopBridge';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {emitMarketplaceChanged, parseManifestJson, type InstalledMarketplaceApp, type ObjectivAppManifest, type ObjectivAppPackage} from './types';
 
 const WEB_STORAGE_KEY = 'objectiv-marketplace-installed-v1';
 
@@ -36,23 +31,18 @@ function writeWebStore(store: WebStore): void {
   localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(store));
 }
 
-async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(cmd, args);
-}
-
 export async function marketplaceAppsDir(): Promise<string | null> {
-  if (!isTauriDesktop()) return null;
+  if (!isElectronDesktop()) return null;
   try {
-    return await tauriInvoke<string>('marketplace_apps_dir');
+    return await nativeInvoke<string>('marketplace_apps_dir');
   } catch {
     return null;
   }
 }
 
 export async function listInstalledApps(): Promise<InstalledMarketplaceApp[]> {
-  if (isTauriDesktop()) {
-    const rows = await tauriInvoke<
+  if (isElectronDesktop()) {
+    const rows = await nativeInvoke<
       { id: string; enabled: boolean; version: string; manifest_json: string }[]
     >('marketplace_list_installed');
     return rows.map((r) => ({
@@ -76,8 +66,8 @@ export async function listInstalledApps(): Promise<InstalledMarketplaceApp[]> {
 export async function installAppPackage(pkg: ObjectivAppPackage): Promise<void> {
   const manifest = pkg.manifest;
   const files = pkg.files ?? {};
-  if (isTauriDesktop()) {
-    await tauriInvoke('marketplace_install', {
+  if (isElectronDesktop()) {
+    await nativeInvoke('marketplace_install', {
       appId: manifest.id,
       manifestJson: JSON.stringify(manifest, null, 2),
       files,
@@ -96,8 +86,8 @@ export async function installAppPackage(pkg: ObjectivAppPackage): Promise<void> 
 }
 
 export async function uninstallApp(appId: string): Promise<void> {
-  if (isTauriDesktop()) {
-    await tauriInvoke('marketplace_uninstall', { appId });
+  if (isElectronDesktop()) {
+    await nativeInvoke('marketplace_uninstall', { appId });
   } else {
     const store = readWebStore();
     delete store.apps[appId];
@@ -107,8 +97,8 @@ export async function uninstallApp(appId: string): Promise<void> {
 }
 
 export async function setAppEnabled(appId: string, enabled: boolean): Promise<void> {
-  if (isTauriDesktop()) {
-    await tauriInvoke('marketplace_set_enabled', { appId, enabled });
+  if (isElectronDesktop()) {
+    await nativeInvoke('marketplace_set_enabled', { appId, enabled });
   } else {
     const store = readWebStore();
     const rec = store.apps[appId];

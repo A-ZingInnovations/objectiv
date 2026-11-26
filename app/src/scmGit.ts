@@ -21,7 +21,13 @@ export type GitSnapshot = {
   localBranches: string[];
   changes: GitChangeRow[];
   commits: GitCommitRow[];
+  rebaseInProgress?: boolean;
+  mergeInProgress?: boolean;
 };
+
+export function gitHasConflicts(changes: GitChangeRow[]): boolean {
+  return changes.some((r) => r.index === 'U' || r.worktree === 'U');
+}
 
 export type GitChangeBucket = 'staged' | 'unstaged';
 

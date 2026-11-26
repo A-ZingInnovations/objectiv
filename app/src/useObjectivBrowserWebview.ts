@@ -1,7 +1,6 @@
-import { useLayoutEffect, useRef } from 'react';
-import { TauriEvent } from '@tauri-apps/api/event';
-import { hideAllBrowserWebviews, syncBrowserWebview } from './browserWebview';
-import { isTauriDesktop } from './desktopWorkspace';
+import {useLayoutEffect, useRef} from 'react';
+import {hideAllBrowserWebviews, syncBrowserWebview} from './browserWebview';
+import {isElectronDesktop} from './desktopWorkspace';
 
 type Args = {
   sessionId: string;
@@ -16,7 +15,7 @@ export function useObjectivBrowserWebview({ sessionId, url, reloadToken, active 
   const hostRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (!isTauriDesktop()) return;
+    if (!isElectronDesktop()) return;
 
     let cancelled = false;
     const unsubs: Array<() => void> = [];
@@ -52,16 +51,11 @@ export function useObjectivBrowserWebview({ sessionId, url, reloadToken, active 
 
     void (async () => {
       try {
-        const { listen } = await import('@tauri-apps/api/event');
-        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        const main = getCurrentWebviewWindow();
+        const { nativeListen } = await import('./desktopBridge');
         if (cancelled) return;
-        unsubs.push(await listen(TauriEvent.WINDOW_RESIZED, run));
-        unsubs.push(await listen(TauriEvent.WINDOW_MOVED, run));
-        unsubs.push(await main.listen(TauriEvent.WINDOW_RESIZED, run));
-        unsubs.push(await main.listen(TauriEvent.WINDOW_MOVED, run));
+        unsubs.push(await nativeListen<unknown>('window-resized', () => run()));
       } catch (e) {
-        console.warn('[browser] window move/resize listeners', e);
+        console.warn('[browser] window resize listener', e);
       }
     })();
 

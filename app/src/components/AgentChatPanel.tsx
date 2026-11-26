@@ -1,11 +1,22 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { FileActions, AgentMessage, PendingEdit } from '../types';
 import AgentPendingApproval from './AgentPendingApproval';
+import LlmSuiteMessage from './LlmSuiteMessage';
 import { submitSidecarApproval } from '../sidecarApproval';
 import { postSidecarChatStream } from '../sidecarChatStream';
+import { suiteChat, type SuiteChatOptsFull } from '../llmSuite';
+
+export type AgentSendOptions = {
+  /** Abort the in-flight turn, then send (steering / interrupt). */
+  interrupt?: boolean;
+  /** Tag the user message as steering for the transcript. */
+  steer?: boolean;
+};
 
 export type AgentChatPanelHandle = {
   submitDecision: (decision: 'accept' | 'reject') => Promise<void>;
+  sendMessage: (text: string, opts?: AgentSendOptions) => Promise<void>;
+  cancelTurn: () => void;
 };
 
 const API_URL =
@@ -26,6 +37,15 @@ type Props = {
   onSidecarApplied?: () => void;
   onPendingChange?: (pending: PendingEdit | null) => void;
   onOpenDiff?: (pending: PendingEdit) => void;
+  /** LLM Suite right panel: transcript only; compose bar is external. */
+  embedded?: boolean;
+  mode?: string;
+  onLoadingChange?: (loading: boolean) => void;
+  onMessagesChange?: (messages: AgentMessage[]) => void;
+  /** When embedded in LLM Suite, restored per chat tab on remount. */
+  initialMessages?: AgentMessage[];
+  /** LLM Suite BYOK/Ollama — when set and not Ollama, chat uses the selected provider (not sidecar). */
+  suiteLlm?: Omit<SuiteChatOptsFull, 'messages'>;
 };
 
 const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentChatPanel(
@@ -42,11 +62,17 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
     onSidecarApplied,
     onPendingChange,
     onOpenDiff,
+    embedded = false,
+    mode,
+    onLoadingChange,
+    onMessagesChange,
+    initialMessages,
+    suiteLlm,
   },
   ref,
 ) {
   const OBJECTIVE_SIDECAR = sidecarUrl.replace(/\/$/, '');
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [messages, setMessages] = useState<AgentMessage[]>(initialMessages ?? []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<PendingEdit | null>(null);
@@ -60,6 +86,14 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
   useEffect(() => {
     onPendingChange?.(pending);
   }, [pending, onPendingChange]);
+
+  useEffect(() => {
+    onLoadingChange?.(loading);
+  }, [loading, onLoadingChange]);
+
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   async function handleSidecarReply(data: {
     reply?: string;
@@ -100,21 +134,53 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
     abortRef.current = null;
   }
 
-  async function send() {
-    const text = input.trim();
-    if (!text || loading || pending) return;
-    setInput('');
-    setMessages((m) => [...m, { role: 'user', content: text }]);
+  async function sendText(text: string, opts?: AgentSendOptions) {
+    const trimmed = text.trim();
+    if (!trimmed || pending) return;
+    if (loading) {
+      if (!opts?.interrupt) return;
+      cancelTurn();
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    const display = opts?.steer ? trimmed : trimmed;
+    const wireText = opts?.steer
+      ? `[Steering] Change course based on this guidance. Do not restart unrelated work; incorporate this now:\n\n${trimmed}`
+      : trimmed;
+    setMessages((m) => [
+      ...m,
+      {
+        role: 'user',
+        content: display,
+        labels: opts?.steer ? ['steer'] : undefined,
+      },
+    ]);
     setLoading(true);
     const ac = new AbortController();
     abortRef.current = ac;
+    const useSuiteByok = Boolean(
+      embedded && suiteLlm && suiteLlm.provider !== 'ollama' && suiteLlm.model.trim(),
+    );
     try {
-      if (OBJECTIVE_SIDECAR) {
+      if (useSuiteByok && suiteLlm) {
+        const history = [...messages, { role: 'user' as const, content: wireText }].map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        const reply = await suiteChat({ ...suiteLlm, messages: history });
+        if (ac.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            content: reply.trim() || '(empty)',
+          },
+        ]);
+      } else if (OBJECTIVE_SIDECAR) {
         const streamIdxRef = { current: null as number | null };
         const data = await postSidecarChatStream(
           OBJECTIVE_SIDECAR,
           pilotUser,
-          { text, sessionId, requireApproval: true },
+          { text: wireText, sessionId, requireApproval: true },
           {
             signal: ac.signal,
             onToken: (delta) => {
@@ -177,7 +243,7 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [...messages, { role: 'user', content: text }].map((m) => ({
+            messages: [...messages, { role: 'user', content: wireText }].map((m) => ({
               role: m.role,
               content: m.content,
             })),
@@ -223,6 +289,13 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
       if (abortRef.current === ac) abortRef.current = null;
       setLoading(false);
     }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text) return;
+    setInput('');
+    await sendText(text);
   }
 
   async function onDecision(decision: 'accept' | 'reject') {
@@ -277,19 +350,21 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
 
   useImperativeHandle(ref, () => ({
     submitDecision: onDecision,
+    sendMessage: sendText,
+    cancelTurn,
   }));
 
   return (
-    <div className="chat-panel">
-      {OBJECTIVE_SIDECAR && (eventsDir || sessionId || workspaceLabel) && (
+    <div className={`chat-panel ${embedded ? 'chat-panel-embedded lf-agent-thread' : ''}`}>
+      {!embedded && OBJECTIVE_SIDECAR && (eventsDir || sessionId || workspaceLabel) && (
         <div className="agent-session-meta">
           {workspaceLabel && <span className="agent-workspace">workspace {workspaceLabel}</span>}
           {eventsDir && <span className="agent-events-dir">{eventsDir}</span>}
           <span className="agent-session-id">session {sessionId}</span>
         </div>
       )}
-      <div className="chat-messages">
-        {messages.length === 0 && (
+      <div className={`chat-messages ${embedded ? 'lf-chat-scroll' : ''}`}>
+        {messages.length === 0 && !embedded && (
           <div className="welcome">
             {OBJECTIVE_SIDECAR ? (
               <>
@@ -303,26 +378,30 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
             )}
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-msg ${msg.role}`}>
-            {msg.content}
-            {msg.runId && <div className="agent-run-id">{msg.runId}</div>}
-            {msg.labels?.map((l) => (
-              <div key={l} className="agent-label">
-                {l}
-              </div>
-            ))}
-            {msg.actions && msg.actions.length > 0 && (
-              <div className="agent-actions">
-                {msg.actions.map((a, j) => (
-                  <span key={j}>
-                    {a.type === 'create_file' ? 'Created' : 'Updated'}: {a.path}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+        {messages.map((msg, i) =>
+          embedded ? (
+            <LlmSuiteMessage key={i} message={msg} mode={mode} />
+          ) : (
+            <div key={i} className={`chat-msg ${msg.role}`}>
+              {msg.content}
+              {msg.runId && <div className="agent-run-id">{msg.runId}</div>}
+              {msg.labels?.map((l) => (
+                <div key={l} className="agent-label">
+                  {l}
+                </div>
+              ))}
+              {msg.actions && msg.actions.length > 0 && (
+                <div className="agent-actions">
+                  {msg.actions.map((a, j) => (
+                    <span key={j}>
+                      {a.type === 'create_file' ? 'Created' : 'Updated'}: {a.path}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ),
+        )}
         {pending && (
           <AgentPendingApproval
             pending={pending}
@@ -331,7 +410,7 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
             onOpenDiff={onOpenDiff ? () => onOpenDiff(pending) : undefined}
           />
         )}
-        {loading && !pending && (
+        {loading && !pending && !embedded && (
           <div className="chat-msg assistant">
             Agent is working…{' '}
             <button type="button" className="agent-cancel-btn" onClick={cancelTurn}>
@@ -341,29 +420,31 @@ const AgentChatPanel = forwardRef<AgentChatPanelHandle, Props>(function AgentCha
         )}
         <div ref={bottomRef} />
       </div>
-      <form
-        className="chat-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Task…"
-          disabled={loading || !!pending}
-        />
-        {loading && !pending ? (
-          <button type="button" onClick={cancelTurn}>
-            Cancel
-          </button>
-        ) : (
-          <button type="submit" disabled={loading || !!pending}>
-            Send
-          </button>
-        )}
-      </form>
+      {!embedded && (
+        <form
+          className="chat-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Task…"
+            disabled={loading || !!pending}
+          />
+          {loading && !pending ? (
+            <button type="button" onClick={cancelTurn}>
+              Cancel
+            </button>
+          ) : (
+            <button type="submit" disabled={loading || !!pending}>
+              Send
+            </button>
+          )}
+        </form>
+      )}
     </div>
   );
 });

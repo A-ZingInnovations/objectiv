@@ -1,37 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  gitCheckout,
-  gitCommit,
-  gitCreateBranch,
-  gitFetch,
-  gitFetchSnapshot,
-  gitPull,
-  gitPush,
-  gitRebase,
-  gitStageAll,
-  gitStagePath,
-  gitUnstagePath,
-  isTauriDesktop,
-  runShellInWorkspace,
-  type GitSnapshot,
-} from '../desktopWorkspace';
-import { promptText } from '../scmPrompt';
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {gitCheckout, gitCommit, gitCreateBranch, gitFetch, gitFetchSnapshot, gitMergeControl, gitPull, gitPush, gitRebase, gitRebaseControl, gitReset, gitRestoreWorktree, gitStageAll, gitStagePath, gitUnstagePath, isElectronDesktop, readWorkspaceFile, runShellInWorkspace, type GitSnapshot} from '../desktopWorkspace';
+import {promptText} from '../scmPrompt';
 import ScmGitToolbar, { type ScmGitAction } from './ScmGitToolbar';
 import FileTypeIcon from './FileTypeIcon';
-import {
-  gitStatusClass,
-  gitStatusCode,
-  gitStatusLabel,
-  splitGitChanges,
-  type GitChangeRow,
-} from '../scmGit';
+import {gitStatusClass, gitStatusCode, gitStatusLabel, gitHasConflicts, splitGitChanges, type GitChangeRow} from '../scmGit';
 import SideBarSection from './SideBarSection';
+import SideBarOpenFolderHint from './SideBarOpenFolderHint';
+import {useObjectivSettings} from '../settingsContext';
+import {isEnterpriseLicensed} from '../objectivLicense';
 
 type Props = {
   workspaceRoot: string | null;
   onRefresh: () => void;
   onOpenFile?: (relPath: string) => void;
-  onOpenGitDiff?: (relPath: string) => void;
+  onOpenFolder?: () => void;
 };
 
 function basename(path: string): string {
@@ -44,7 +26,12 @@ function dirname(path: string): string {
   return slash >= 0 ? path.slice(0, slash) : '';
 }
 
-export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenGitDiff }: Props) {
+export default function ScmPanel({
+  workspaceRoot,
+  onRefresh,
+  onOpenFile,
+  onOpenFolder,
+}: Props) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,13 +46,19 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
   const [scanOutput, setScanOutput] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
+  const [diffFile, setDiffFile] = useState<string | null>(null);
+  const [diffBefore, setDiffBefore] = useState<string>('');
+  const [diffAfter, setDiffAfter] = useState<string>('');
+  const [diffBusy, setDiffBusy] = useState(false);
+  const { settings } = useObjectivSettings();
+  const professionalNetwork = isEnterpriseLicensed(settings);
 
   const rootLabel = workspaceRoot
     ? workspaceRoot.replace(/\/$/, '').split(/[/\\]/).pop() || workspaceRoot
     : null;
 
   const loadSnapshot = useCallback(async () => {
-    if (!workspaceRoot || !isTauriDesktop()) {
+    if (!workspaceRoot || !isElectronDesktop()) {
       setSnapshot(null);
       return;
     }
@@ -91,9 +84,35 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
     onRefresh();
   }, [loadSnapshot, onRefresh]);
 
+  const viewDiff = useCallback(async (relPath: string) => {
+    if (!workspaceRoot || !isElectronDesktop()) return;
+    setDiffBusy(true);
+    setDiffFile(relPath);
+    setDiffBefore('');
+    setDiffAfter('');
+    try {
+      const before = await readWorkspaceFile(workspaceRoot, relPath);
+      let after = '';
+      try {
+        after = await runShellInWorkspace(
+          workspaceRoot,
+          `git show HEAD:${relPath.replace(/'/g, `'\\''`)}`,
+        );
+      } catch {
+        after = '(no HEAD version)';
+      }
+      setDiffBefore(before);
+      setDiffAfter(after);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDiffBusy(false);
+    }
+  }, [workspaceRoot]);
+
   const runGit = useCallback(
     async (fn: () => Promise<void | string>) => {
-      if (!workspaceRoot || !isTauriDesktop()) return;
+      if (!workspaceRoot || !isElectronDesktop()) return;
       setBusy(true);
       setError(null);
       setNotice(null);
@@ -133,10 +152,13 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
             await runGit(async () => gitFetch(workspaceRoot));
             break;
           case 'pull':
-            await runGit(async () => gitPull(workspaceRoot, false));
+            await runGit(async () => gitPull(workspaceRoot));
+            break;
+          case 'pullFfOnly':
+            await runGit(async () => gitPull(workspaceRoot, { ffOnly: true }));
             break;
           case 'pullRebase':
-            await runGit(async () => gitPull(workspaceRoot, true));
+            await runGit(async () => gitPull(workspaceRoot, { rebase: true }));
             break;
           case 'push':
             await runGit(async () => gitPush(workspaceRoot, false));
@@ -147,10 +169,37 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
           case 'rebase':
             await runGit(async () => gitRebase(workspaceRoot));
             break;
+          case 'rebaseContinue':
+            await runGit(async () => gitRebaseControl(workspaceRoot, 'continue'));
+            break;
+          case 'rebaseAbort':
+            await runGit(async () => gitRebaseControl(workspaceRoot, 'abort'));
+            break;
+          case 'rebaseSkip':
+            await runGit(async () => gitRebaseControl(workspaceRoot, 'skip'));
+            break;
+          case 'mergeContinue':
+            await runGit(async () => gitMergeControl(workspaceRoot, 'continue'));
+            break;
+          case 'mergeAbort':
+            await runGit(async () => gitMergeControl(workspaceRoot, 'abort'));
+            break;
           case 'stageAll':
             await runGit(async () => {
               await gitStageAll(workspaceRoot);
             });
+            break;
+          case 'discardAll':
+            await runGit(async () => gitRestoreWorktree(workspaceRoot));
+            break;
+          case 'resetSoft':
+            await runGit(async () => gitReset(workspaceRoot, 'soft'));
+            break;
+          case 'resetMixed':
+            await runGit(async () => gitReset(workspaceRoot, 'mixed'));
+            break;
+          case 'resetHard':
+            await runGit(async () => gitReset(workspaceRoot, 'hard'));
             break;
           default:
             break;
@@ -171,7 +220,7 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
   );
 
   const runSecurityScan = useCallback(async () => {
-    if (!workspaceRoot || !isTauriDesktop()) return;
+    if (!workspaceRoot || !isElectronDesktop()) return;
     setScanBusy(true);
     setScanOutput('');
     try {
@@ -216,22 +265,47 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
           <span className="scm-change-name">{base}</span>
           {dir && <span className="scm-change-dir">{dir}</span>}
         </button>
+        <button
+          type="button"
+          className="scm-icon-btn"
+          title="View diff"
+          aria-label={`View diff ${row.path}`}
+          onClick={() => void viewDiff(row.path)}
+        >
+          <span className="codicon codicon-diff" aria-hidden />
+        </button>
         <div className="scm-change-actions">
           {mode === 'unstaged' ? (
-            <button
-              type="button"
-              className="scm-icon-btn"
-              title="Stage"
-              aria-label={`Stage ${row.path}`}
-              disabled={busy}
-              onClick={() =>
-                void runGit(async () => {
-                  await gitStagePath(workspaceRoot!, row.path);
-                })
-              }
-            >
-              <span className="codicon codicon-add" aria-hidden />
-            </button>
+            <>
+              <button
+                type="button"
+                className="scm-icon-btn"
+                title="Stage"
+                aria-label={`Stage ${row.path}`}
+                disabled={busy}
+                onClick={() =>
+                  void runGit(async () => {
+                    await gitStagePath(workspaceRoot!, row.path);
+                  })
+                }
+              >
+                <span className="codicon codicon-add" aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="scm-icon-btn"
+                title="Discard changes"
+                aria-label={`Discard changes ${row.path}`}
+                disabled={busy || code === '?' }
+                onClick={() =>
+                  void runGit(async () => {
+                    await gitRestoreWorktree(workspaceRoot!, row.path);
+                  })
+                }
+              >
+                <span className="codicon codicon-discard" aria-hidden />
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -258,24 +332,48 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
       ? `${snapshot.ahead}↑ ${snapshot.behind}↓`
       : null;
 
+  const conflicted = snapshot ? gitHasConflicts(snapshot.changes) : false;
+
   return (
     <>
       <div className="side-bar-title">
         <span>SOURCE CONTROL{rootLabel ? ` · ${rootLabel}` : ''}</span>
         <ScmGitToolbar
           disabled={busy || loading}
-          hasRepo={Boolean(snapshot && workspaceRoot && isTauriDesktop())}
+          hasRepo={Boolean(snapshot && workspaceRoot && isElectronDesktop())}
           onAction={handleGitAction}
         />
       </div>
 
       <div className="scm-panel">
-        {!workspaceRoot && <p className="side-bar-placeholder-hint">Open folder…</p>}
-        {!isTauriDesktop() && workspaceRoot && (
+        {!workspaceRoot &&
+          (onOpenFolder ? (
+            <SideBarOpenFolderHint onOpenFolder={onOpenFolder} />
+          ) : (
+            <p className="side-bar-placeholder-hint">Open folder…</p>
+          ))}
+        {!isElectronDesktop() && workspaceRoot && (
           <p className="side-bar-placeholder-hint">Source control requires the Objectiv desktop app.</p>
         )}
 
         {notice && <p className="scm-notice">{notice}</p>}
+
+        {conflicted && (
+          <p className="scm-conflict-banner" role="status">
+            Merge conflicts — resolve files marked <strong>U</strong>, then continue merge/rebase from
+            ⋯ or commit.
+          </p>
+        )}
+        {snapshot?.rebaseInProgress && (
+          <p className="scm-state-banner" role="status">
+            Rebase in progress
+          </p>
+        )}
+        {snapshot?.mergeInProgress && !snapshot?.rebaseInProgress && (
+          <p className="scm-state-banner" role="status">
+            Merge in progress
+          </p>
+        )}
 
         {snapshot && (
           <div className="scm-branch-card scm-branch-card--interactive">
@@ -334,7 +432,7 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
           </div>
         )}
 
-        {workspaceRoot && isTauriDesktop() && (
+        {workspaceRoot && isElectronDesktop() && (
           <div className="scm-commit-box">
             <textarea
               className="scm-message scm-message-area"
@@ -468,7 +566,7 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
                       <button
                         type="button"
                         className="sidebar-section-item"
-                        onClick={() => onOpenGitDiff?.(row.path)}
+                        onClick={() => void viewDiff(row.path)}
                       >
                         <FileTypeIcon path={row.path} className="sidebar-section-item-icon" size="sm" />
                         <span className="sidebar-section-item-label">{row.path}</span>
@@ -486,29 +584,66 @@ export default function ScmPanel({ workspaceRoot, onRefresh, onOpenFile, onOpenG
               onToggle={() => setSecurityOpen((v) => !v)}
               className="scm-security-section"
               actions={
-                <button
-                  type="button"
-                  className="scm-icon-btn"
-                  title="Run npm / pip audit"
-                  disabled={scanBusy || !workspaceRoot}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void runSecurityScan();
-                  }}
-                >
-                  <span
-                    className={`codicon codicon-shield ${scanBusy ? 'codicon-modifier-spin' : ''}`}
-                    aria-hidden
-                  />
-                </button>
+                professionalNetwork ? (
+                  <button
+                    type="button"
+                    className="scm-icon-btn"
+                    title="Run npm / pip audit"
+                    disabled={scanBusy || !workspaceRoot}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void runSecurityScan();
+                    }}
+                  >
+                    <span
+                      className={`codicon codicon-shield ${scanBusy ? 'codicon-modifier-spin' : ''}`}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null
               }
             >
-              {!scanOutput ? (
+              {!professionalNetwork ? (
+                <p className="sidebar-section-empty">
+                  Enterprise seat required — vulnerability scans run on the professional network.
+                </p>
+              ) : !scanOutput ? (
                 <p className="sidebar-section-empty">Run scan for npm audit / pip audit</p>
               ) : (
                 <pre className="scm-scan-output">{scanOutput}</pre>
               )}
             </SideBarSection>
+          </div>
+        )}
+
+        {diffFile && (
+          <div className="scm-diff-panel">
+            <div className="scm-diff-header">
+              <span className="codicon codicon-diff" aria-hidden />
+              <span className="scm-diff-title">Diff: {diffFile}</span>
+              <button
+                type="button"
+                className="scm-diff-close"
+                title="Close diff"
+                onClick={() => setDiffFile(null)}
+              >
+                <span className="codicon codicon-close" aria-hidden />
+              </button>
+            </div>
+            {diffBusy ? (
+              <p className="scm-diff-loading">Loading diff…</p>
+            ) : (
+              <div className="scm-diff-sides">
+                <div className="scm-diff-side scm-diff-before">
+                  <div className="scm-diff-side-header">Working Tree</div>
+                  <pre className="scm-diff-code">{diffBefore}</pre>
+                </div>
+                <div className="scm-diff-side scm-diff-after">
+                  <div className="scm-diff-side-header">HEAD</div>
+                  <pre className="scm-diff-code">{diffAfter}</pre>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

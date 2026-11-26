@@ -1,14 +1,9 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
 import SideBarSection from './SideBarSection';
 import type { BrowserSession } from '../browser';
-import {
-  BROWSER_AUTOMATION_FIXTURES,
-  BROWSER_START_LINKS,
-  browserFixtureUrl,
-  type BrowserFixtureId,
-} from '../browserPages';
-import { isTauriDesktop } from '../desktopWorkspace';
-import { useObjectivBrowserWebview } from '../useObjectivBrowserWebview';
+import {BROWSER_AUTOMATION_FIXTURES, BROWSER_START_LINKS, browserFixtureUrl, type BrowserFixtureId} from '../browserPages';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {useObjectivBrowserWebview} from '../useObjectivBrowserWebview';
 
 type Props = {
   session: BrowserSession;
@@ -42,7 +37,7 @@ export default function BrowserView({
   webviewActive = true,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const useNativeWebview = isTauriDesktop();
+  const useNativeWebview = isElectronDesktop();
   const frameHostRef = useObjectivBrowserWebview({
     sessionId: session.id,
     url: session.url,

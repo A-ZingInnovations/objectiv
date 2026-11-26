@@ -1,29 +1,46 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Terminal} from '@xterm/xterm';
+import {FitAddon} from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import {
-  isTauriDesktop,
-  ptyKill,
-  ptyResize,
-  ptySpawn,
-  ptyWrite,
-} from '../desktopWorkspace';
-import { useObjectivSettings } from '../settingsContext';
-import { SHELL_PROFILES, shellLabel, type ShellProfileId } from '../terminalShells';
-import { xtermThemeForWorkbench } from '../terminalTheme';
+import {isElectronDesktop, ptyKill, ptyResize, ptySpawn, ptyWrite, userHomeDir} from '../desktopWorkspace';
+import {useObjectivSettings} from '../settingsContext';
+import {SHELL_PROFILES, shellLabel, type ShellProfileId} from '../terminalShells';
+import {xtermThemeForWorkbench} from '../terminalTheme';
 
 type TermTab = {
   key: string;
   sessionId: string | null;
+  remoteSessionId: number | null;
   shell: string;
+  argv?: string[];
+  cwd?: string;
   title: string;
   exited: boolean;
+};
+
+export type RemoteTerminalSession = {
+  id: number;
+  title: string;
+  shell: string;
+  argv: string[];
+  cwd: string;
+};
+
+type SplitDirection = 'none' | 'horizontal' | 'vertical';
+
+type SplitNode = {
+  id: string;
+  direction: SplitDirection;
+  terminalKey: string | null;
+  children: SplitNode[];
 };
 
 type Props = {
   workspaceRoot: string | null;
   embedded?: boolean;
+  remoteSession?: RemoteTerminalSession | null;
+  /** Called when a terminal tab for this remote session is killed, so the parent can remove it. */
+  onRemoteKill?: (sessionId: number) => void;
 };
 
 let tabSeq = 1;
@@ -32,18 +49,33 @@ function nextKey(): string {
   return `term-${tabSeq++}`;
 }
 
+let splitSeq = 1;
+
+function nextSplitId(): string {
+  return `split-${splitSeq++}`;
+}
+
 function titleForShell(shell: string, existing: TermTab[]): string {
   const base = shellLabel(shell) || 'shell';
   const same = existing.filter((t) => shellLabel(t.shell) === base).length;
   return same === 0 ? base : `${base} ${same + 1}`;
 }
 
-export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
+export default function XtermTerminal({
+  workspaceRoot,
+  embedded,
+  remoteSession,
+  onRemoteKill,
+}: Props) {
   const { settings } = useObjectivSettings();
   const defaultShell = settings.defaultShell || '';
   const [tabs, setTabs] = useState<TermTab[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [newShellProfile, setNewShellProfile] = useState<ShellProfileId>('default');
+  const [splits, setSplits] = useState<SplitNode[]>([
+    { id: 'root', direction: 'none', terminalKey: null, children: [] },
+  ]);
+  const [homeDir, setHomeDir] = useState<string | null>(null);
   const hostsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const termsRef = useRef<Map<string, { term: Terminal; fit: FitAddon; sessionId: string | null }>>(
     new Map(),
@@ -59,48 +91,79 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
     [defaultShell],
   );
 
+  const effectiveCwd = workspaceRoot ?? homeDir;
+
   const createTab = useCallback(
-    async (shellPath: string) => {
-      if (!isTauriDesktop() || !workspaceRoot) return;
+    async (shellPath: string, opts?: { argv?: string[]; cwd?: string; title?: string }) => {
+      if (!isElectronDesktop() || !effectiveCwd) return;
       const key = nextKey();
-      const title = titleForShell(shellPath || 'shell', tabsRef.current);
+      const title = opts?.title ?? titleForShell(shellPath || 'shell', tabsRef.current);
       setTabs((t) => [
         ...t,
-        { key, sessionId: null, shell: shellPath || 'default', title, exited: false },
+        {
+          key,
+          sessionId: null,
+          remoteSessionId: null,
+          shell: shellPath || 'default',
+          argv: opts?.argv,
+          cwd: opts?.cwd ?? effectiveCwd,
+          title,
+          exited: false,
+        },
       ]);
+      setActiveKey(key);
     },
-    [workspaceRoot],
+    [effectiveCwd],
   );
+
+  useEffect(() => {
+    if (!isElectronDesktop()) return;
+    void userHomeDir().then((h) => {
+      if (h) setHomeDir(h);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!remoteSession || !isElectronDesktop()) return;
+    void createTab(remoteSession.shell, {
+      argv: remoteSession.argv,
+      cwd: remoteSession.cwd,
+      title: remoteSession.title,
+    }).then(() => {
+      setTabs((ts) =>
+        ts.map((t) => (t.title === remoteSession.title ? { ...t, remoteSessionId: remoteSession.id } : t)),
+      );
+    });
+  }, [remoteSession, createTab, onRemoteKill]);
 
   useEffect(() => {
     setTabs([]);
     setActiveKey(null);
     hostsRef.current.clear();
-    if (!workspaceRoot || !isTauriDesktop()) return;
+    if (!effectiveCwd || !isElectronDesktop()) return;
+    if (tabsRef.current.length > 0) return;
     void createTab(defaultShell);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceRoot]);
+  }, [effectiveCwd]);
 
   useEffect(() => {
-    if (!workspaceRoot || !isTauriDesktop()) return;
+    if (!effectiveCwd || !isElectronDesktop()) return;
     let cancelled = false;
     let unlistenOut: (() => void) | undefined;
     let unlistenExit: (() => void) | undefined;
 
     void (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      if (cancelled) return;
-      unlistenOut = await listen<{ id: string; data: string }>('pty-output', (ev) => {
+      const onOut = (payload: { id: string; data: string }) => {
         for (const entry of termsRef.current.values()) {
-          if (entry.sessionId === ev.payload.id) {
-            entry.term.write(ev.payload.data);
+          if (entry.sessionId === payload.id) {
+            entry.term.write(payload.data);
             break;
           }
         }
-      });
-      unlistenExit = await listen<{ id: string }>('pty-exit', (ev) => {
+      };
+      const onExit = (payload: { id: string }) => {
         for (const [key, entry] of termsRef.current.entries()) {
-          if (entry.sessionId === ev.payload.id) {
+          if (entry.sessionId === payload.id) {
             entry.term.writeln('\r\n[process exited]');
             entry.sessionId = null;
             setTabs((ts) =>
@@ -109,7 +172,13 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
             break;
           }
         }
-      });
+      };
+      if (isElectronDesktop()) {
+        const { nativeListen } = await import('../desktopBridge');
+        if (cancelled) return;
+        unlistenOut = await nativeListen<{ id: string; data: string }>('pty-output', onOut);
+        unlistenExit = await nativeListen<{ id: string }>('pty-exit', onExit);
+      }
     })();
 
     return () => {
@@ -117,10 +186,10 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
       unlistenOut?.();
       unlistenExit?.();
     };
-  }, [workspaceRoot]);
+  }, [effectiveCwd]);
 
   useEffect(() => {
-    if (!workspaceRoot || !isTauriDesktop()) return;
+    if (!effectiveCwd || !isElectronDesktop()) return;
 
     for (const tab of tabs) {
       if (termsRef.current.has(tab.key)) continue;
@@ -144,9 +213,13 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
       termsRef.current.set(tab.key, entry);
 
       const shellPath = tab.shell === 'default' ? defaultShell : tab.shell;
+      const cwd = tab.cwd ?? effectiveCwd;
       void (async () => {
         try {
-          const id = await ptySpawn(workspaceRoot, { shell: shellPath || undefined });
+          const id = await ptySpawn(cwd, {
+            shell: shellPath || undefined,
+            argv: tab.argv,
+          });
           entry.sessionId = id;
           setTabs((ts) => ts.map((t) => (t.key === tab.key ? { ...t, sessionId: id } : t)));
           const dims = fit.proposeDimensions();
@@ -179,7 +252,7 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
     }
   }, [
     tabs,
-    workspaceRoot,
+    effectiveCwd,
     defaultShell,
     settings.terminalFontSize,
     settings.terminalFontFamily,
@@ -245,7 +318,11 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
 
   const killTab = useCallback((key: string) => {
     const entry = termsRef.current.get(key);
+    const tab = tabs.find((t) => t.key === key);
     if (entry?.sessionId) void ptyKill(entry.sessionId);
+    if (tab && tab.remoteSessionId !== null && tab.remoteSessionId !== undefined && onRemoteKill) {
+      onRemoteKill(tab.remoteSessionId);
+    }
     setTabs((ts) => {
       const next = ts.filter((t) => t.key !== key);
       setActiveKey((cur) => {
@@ -254,13 +331,13 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
       });
       return next;
     });
-  }, []);
+  }, [onRemoteKill]);
 
   const shellOptions = useMemo(
     () => SHELL_PROFILES.filter((p) => p.id !== 'custom' as ShellProfileId),
     [],
   );
-  const canUsePty = Boolean(workspaceRoot && isTauriDesktop());
+  const canUsePty = Boolean(effectiveCwd && isElectronDesktop());
   const active = tabs.find((t) => t.key === activeKey) ?? null;
 
   return (
@@ -337,6 +414,44 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
           >
             <span className="codicon codicon-add" aria-hidden />
           </button>
+          <button
+            type="button"
+            className="console-split"
+            disabled={!canUsePty}
+            title="Split Terminal (horizontal)"
+            onClick={() => {
+              setSplits((prev) => [
+                ...prev,
+                {
+                  id: nextSplitId(),
+                  direction: 'horizontal',
+                  terminalKey: activeKey ?? null,
+                  children: [],
+                },
+              ]);
+            }}
+          >
+            <span className="codicon codicon-split-horizontal" aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="console-split"
+            disabled={!canUsePty}
+            title="Split Terminal (vertical)"
+            onClick={() => {
+              setSplits((prev) => [
+                ...prev,
+                {
+                  id: nextSplitId(),
+                  direction: 'vertical',
+                  terminalKey: activeKey ?? null,
+                  children: [],
+                },
+              ]);
+            }}
+          >
+            <span className="codicon codicon-split-vertical" aria-hidden />
+          </button>
         </div>
       </header>
 
@@ -345,12 +460,23 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
           <div className="console-empty">
             <p className="console-empty-title">No console yet</p>
             <p className="console-empty-copy">
-              {!isTauriDesktop()
-                ? 'Use the Objectiv desktop app for an interactive shell.'
-                : 'Open a folder to attach a shell to this workspace.'}
+              {!isElectronDesktop()
+                ? 'Use the Objectiv desktop app for SSH, SFTP, and local shells.'
+                : 'Open a folder or connect via SSH/SFTP from the Explorer welcome.'}
             </p>
           </div>
         )}
+        <div className="xterm-split-container" style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+          {splits.map((split) => (
+            <SplitPaneView
+              key={split.id}
+              split={split}
+              termsRef={termsRef}
+              activeKey={activeKey}
+              setActiveKey={setActiveKey}
+            />
+          ))}
+        </div>
         {tabs.map((tab) => (
           <div
             key={tab.key}
@@ -362,6 +488,68 @@ export default function XtermTerminal({ workspaceRoot, embedded }: Props) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function SplitPaneView({
+  split,
+  termsRef,
+  activeKey,
+  setActiveKey,
+}: {
+  split: SplitNode;
+  termsRef: React.MutableRefObject<Map<string, { term: Terminal; fit: FitAddon; sessionId: string | null }>>;
+  activeKey: string | null;
+  setActiveKey: (key: string | null) => void;
+}) {
+  const key = split.terminalKey;
+  const entry = key ? termsRef.current.get(key) : undefined;
+
+  if (!key || !entry) {
+    return (
+      <div
+        key={split.id}
+        data-split-id={split.id}
+        className="xterm-split-leaf"
+        style={{ flex: 1, minHeight: 0 }}
+      >
+        <div className="terminal-empty">
+          <span className="codicon codicon-terminal" aria-hidden />
+          <p>No terminal session</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isActive = key === activeKey;
+
+  return (
+    <div
+      key={split.id}
+      data-split-id={split.id}
+      className="xterm-split-leaf"
+      style={{ flex: 1, minHeight: 0 }}
+    >
+      <div className="terminal-tab-bar">
+        <div
+          className={`terminal-tab ${isActive ? 'active' : ''}`}
+          onClick={() => setActiveKey(key)}
+        >
+          Terminal
+          <span
+            className="codicon codicon-close terminal-tab-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveKey(null);
+              if (entry.sessionId) void ptyKill(entry.sessionId);
+            }}
+          >
+            <span className="codicon codicon-close" aria-hidden />
+          </span>
+        </div>
+      </div>
+      <div className="xterm-host-split" style={{ flex: 1, minHeight: 0 }} />
     </div>
   );
 }

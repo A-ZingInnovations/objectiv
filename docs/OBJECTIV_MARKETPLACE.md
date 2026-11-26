@@ -6,7 +6,7 @@ Objectiv ships a **curated app catalog** (themes, snippets, agent-tool bundles, 
 
 1. Open the **Extensions** activity bar (Marketplace panel).
 2. Search or filter by category → **Install**.
-3. Apps install under **`~/.objectiv/apps/<id>/`** on desktop (Tauri). Web dev builds use localStorage.
+3. Apps install under **`~/.objectiv/apps/<id>/`** on desktop (Electron). Web dev builds use localStorage.
 
 Theme apps can apply a workbench palette or accent on install. Enable/disable toggles contributions without uninstalling.
 

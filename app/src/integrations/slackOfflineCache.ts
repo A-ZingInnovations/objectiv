@@ -1,6 +1,7 @@
 import type { ChatMessage } from './messagingHistory';
 import type { SlackLiveConversation } from './slackLive';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {nativeInvoke} from '../desktopBridge';
 
 export const SLACK_CACHE_VERSION = 2 as const;
 
@@ -47,10 +48,9 @@ export async function loadSlackTeamStore(teamId: string): Promise<SlackTeamStore
   const mem = memoryStores.get(id);
   if (mem) return mem;
 
-  if (isTauriDesktop()) {
+  if (isElectronDesktop()) {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const raw = await invoke<string | null>('slack_cache_read', { teamId: id });
+          const raw = await nativeInvoke<string | null>('slack_cache_read', { teamId: id });
       if (raw?.trim()) return parseStore(raw);
     } catch {
       /* fall through to localStorage */
@@ -70,10 +70,9 @@ async function flushSlackTeamStore(store: SlackTeamStore): Promise<void> {
   const json = JSON.stringify(store);
   rememberLastSlackTeam(store.teamId);
 
-  if (isTauriDesktop()) {
+  if (isElectronDesktop()) {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('slack_cache_write', { teamId: store.teamId, json });
+          await nativeInvoke('slack_cache_write', { teamId: store.teamId, json });
       return;
     } catch {
       /* fall through */
@@ -108,7 +107,7 @@ export function saveSlackTeamStoreDebounced(store: SlackTeamStore, delayMs = 800
 
 /** Desktop: `app data/slack-cache/<team>.json`; web fallback: localStorage. */
 export function slackCacheLocationHint(): string {
-  return isTauriDesktop()
+  return isElectronDesktop()
     ? 'Objectiv app data → slack-cache (per workspace JSON)'
     : 'Browser localStorage (objectiv.slack.cache.v1.*)';
 }

@@ -1,3 +1,6 @@
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import ContextMenuPortal from './ContextMenuPortal';
+import { AZING_LOGO_URL, OBJECTIV_MARK_URL } from '../brandAssets';
 import { COMPANY_WORDMARK, PRODUCT_TAGLINE } from '../branding';
 import { workspaceFolderLabel } from '../desktopWorkspace';
 import { useObjectivSettings } from '../settingsContext';
@@ -58,16 +61,26 @@ export default function WorkspaceWelcome({
   shortcuts,
 }: Props) {
   const { settings } = useObjectivSettings();
+  const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
+
+  const openMenu = (e: ReactMouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a, input, textarea')) return;
+    e.preventDefault();
+    setCtx({ x: e.clientX, y: e.clientY });
+  };
+
   const lockupClass = settings.welcomeBrandTransparent
     ? 'workspace-welcome-azing-lockup workspace-welcome-azing-lockup--transparent'
     : 'workspace-welcome-azing-lockup workspace-welcome-azing-lockup--glass';
 
+  const menuShortcuts = shortcuts.filter((s) => s.onClick);
+
   return (
-    <div className="workspace-welcome" aria-label="Workspace">
+    <div className="workspace-welcome" aria-label="Workspace" onContextMenu={openMenu}>
       <div className="workspace-welcome-bg" aria-hidden />
       <img
         className="workspace-welcome-watermark"
-        src="/objectiv-azo-logo.jpg"
+        src={OBJECTIV_MARK_URL}
         alt=""
         width={560}
         height={560}
@@ -77,8 +90,8 @@ export default function WorkspaceWelcome({
 
       <footer className={lockupClass}>
         <img
-          className="workspace-welcome-azing-mark"
-          src="/azing-logo.png"
+          className="workspace-welcome-azing-mark workspace-welcome-azing-mark--white"
+          src={AZING_LOGO_URL}
           alt=""
           width={32}
           height={32}
@@ -107,6 +120,23 @@ export default function WorkspaceWelcome({
           ))}
         </nav>
       </div>
+      {ctx && menuShortcuts.length > 0 && (
+        <ContextMenuPortal at={ctx} onClose={() => setCtx(null)} widthHint={220}>
+          {menuShortcuts.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                s.onClick?.();
+                setCtx(null);
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </ContextMenuPortal>
+      )}
     </div>
   );
 }

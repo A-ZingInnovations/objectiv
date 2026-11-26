@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import ContextMenuPortal, { contextMenuItem } from './ContextMenuPortal';
 import ExplorerWelcome from './ExplorerWelcome';
 import { displayPath, encodeDiskPath, parseDiskPath } from '../workspaceDisk';
 import { workspaceFolderLabel } from '../desktopWorkspace';
@@ -25,6 +26,7 @@ type ExplorerActions = {
   onOpenFolder: () => void;
   onAddFolder: () => void;
   onCloneRepository?: () => void;
+  onConnectHost?: (kind: 'ssh' | 'sftp') => void;
   onSelectRoot: (rootIndex: number) => void;
   onCloseFolder?: (rootIndex?: number) => void;
   onRefresh: () => void;
@@ -123,20 +125,6 @@ function getTree(paths: string[]): Record<string, unknown> {
   return root;
 }
 
-function menuItem(
-  label: string,
-  icon: string,
-  onClick: () => void,
-  disabled = false,
-) {
-  return (
-    <button type="button" role="menuitem" disabled={disabled} onClick={onClick}>
-      <span className={`codicon codicon-${icon}`} aria-hidden />
-      {label}
-    </button>
-  );
-}
-
 function ExplorerContextMenu({
   ctx,
   onClose,
@@ -161,25 +149,11 @@ function ExplorerContextMenu({
     findInFolder?: (dirPath: string) => void;
     refresh: () => void;
     closeRoot?: (rootIndex: number) => void;
+    addFolderToWorkspace?: () => void;
+    openFolder?: () => void;
+    cloneRepository?: () => void;
   };
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
-
   const isFile = ctx.kind === 'file';
   const isDir = ctx.kind === 'dir';
   const isRootish = ctx.kind === 'root' || ctx.kind === 'blank';
@@ -195,37 +169,32 @@ function ExplorerContextMenu({
     onClose();
   };
 
-  const left = Math.min(ctx.x, window.innerWidth - 240);
-  const top = Math.min(ctx.y, window.innerHeight - 360);
+  const item = (label: string, icon: string, fn: () => void, disabled = false) =>
+    contextMenuItem(label, icon, () => run(fn), disabled);
 
   return (
-    <div
-      ref={ref}
+  <ContextMenuPortal
+      at={ctx}
       className="explorer-context-menu tab-context-menu"
-      style={{ left, top }}
-      role="menu"
+      onClose={onClose}
     >
-      {menuItem('New File…', 'new-file', () => run(() => actions.newFile(dirPath)))}
-      {menuItem('New Folder…', 'new-folder', () => run(() => actions.newFolder(dirPath)))}
+      {item('New File…', 'new-file', () => actions.newFile(dirPath))}
+      {item('New Folder…', 'new-folder', () => actions.newFolder(dirPath))}
 
       {(isFile || isDir) && (
         <>
           <div className="menu-dropdown-sep" />
           {isFile &&
             actions.open &&
-            menuItem('Open', 'go-to-file', () => run(() => actions.open!(ctx.path)))}
+            item('Open', 'go-to-file', () => actions.open!(ctx.path))}
           {isFile &&
             actions.openToSide &&
-            menuItem('Open to the Side', 'split-horizontal', () =>
-              run(() => actions.openToSide!(ctx.path)),
-            )}
+            item('Open to the Side', 'split-horizontal', () => actions.openToSide!(ctx.path))}
           {actions.reveal &&
-            menuItem('Reveal in Finder', 'file-directory', () =>
-              run(() => actions.reveal!(targetPath)),
-            )}
+            item('Reveal in Finder', 'file-directory', () => actions.reveal!(targetPath))}
           {actions.openInTerminal &&
-            menuItem('Open in Integrated Terminal', 'terminal', () =>
-              run(() => actions.openInTerminal!(isFile ? dirPath : targetPath)),
+            item('Open in Integrated Terminal', 'terminal', () =>
+              actions.openInTerminal!(isFile ? dirPath : targetPath),
             )}
         </>
       )}
@@ -233,13 +202,9 @@ function ExplorerContextMenu({
       {isRootish && actions.reveal && (
         <>
           <div className="menu-dropdown-sep" />
-          {menuItem('Reveal in Finder', 'file-directory', () =>
-            run(() => actions.reveal!(targetPath)),
-          )}
+          {item('Reveal in Finder', 'file-directory', () => actions.reveal!(targetPath))}
           {actions.openInTerminal &&
-            menuItem('Open in Integrated Terminal', 'terminal', () =>
-              run(() => actions.openInTerminal!(targetPath)),
-            )}
+            item('Open in Integrated Terminal', 'terminal', () => actions.openInTerminal!(targetPath))}
         </>
       )}
 
@@ -249,28 +214,21 @@ function ExplorerContextMenu({
           <div className="menu-dropdown-sep" />
           {(isFile || isDir) &&
             actions.cutItem &&
-            menuItem('Cut', 'cut', () => run(() => actions.cutItem!(targetPath, isDir)))}
+            item('Cut', 'cut', () => actions.cutItem!(targetPath, isDir))}
           {(isFile || isDir) &&
             actions.copyItem &&
-            menuItem('Copy', 'files', () => run(() => actions.copyItem!(targetPath, isDir)))}
+            item('Copy', 'files', () => actions.copyItem!(targetPath, isDir))}
           {(isFile || isDir || isRootish) &&
             actions.pasteItem &&
-            menuItem(
-              'Paste',
-              'clippy',
-              () => run(() => actions.pasteItem!(dirPath)),
-              !actions.canPaste,
-            )}
+            item('Paste', 'clippy', () => actions.pasteItem!(dirPath), !actions.canPaste)}
         </>
       ) : null}
 
       {(isFile || isDir || isRootish) && actions.copyPath && (
         <>
           <div className="menu-dropdown-sep" />
-          {menuItem('Copy Path', 'copy', () => run(() => actions.copyPath!(targetPath, false)))}
-          {menuItem('Copy Relative Path', 'copy', () =>
-            run(() => actions.copyPath!(targetPath, true)),
-          )}
+          {item('Copy Path', 'copy', () => actions.copyPath!(targetPath, false))}
+          {item('Copy Relative Path', 'copy', () => actions.copyPath!(targetPath, true))}
         </>
       )}
 
@@ -278,31 +236,40 @@ function ExplorerContextMenu({
         <>
           <div className="menu-dropdown-sep" />
           {actions.rename &&
-            menuItem('Rename…', 'edit', () => run(() => actions.rename!(targetPath, isDir)))}
-          {actions.deletePath &&
-            menuItem('Delete…', 'trash', () => run(() => actions.deletePath!(targetPath, isDir)))}
+            item('Rename…', 'edit', () => actions.rename!(targetPath, isDir))}
+          {actions.deletePath && item('Delete…', 'trash', () => actions.deletePath!(targetPath, isDir))}
         </>
       )}
 
       {(isDir || isRootish) && actions.findInFolder && (
         <>
           <div className="menu-dropdown-sep" />
-          {menuItem('Find in Folder…', 'search', () =>
-            run(() => actions.findInFolder!(dirPath)),
-          )}
+          {item('Find in Folder…', 'search', () => actions.findInFolder!(dirPath))}
         </>
       )}
 
       <div className="menu-dropdown-sep" />
-      {menuItem('Refresh Explorer', 'refresh', () => run(() => actions.refresh()))}
+      {item('Refresh Explorer', 'refresh', () => actions.refresh())}
+
+      {isRootish && (actions.addFolderToWorkspace || actions.openFolder || actions.cloneRepository) && (
+        <>
+          <div className="menu-dropdown-sep" />
+          {actions.addFolderToWorkspace &&
+            item('Add Folder to Workspace…', 'folder-library', () => actions.addFolderToWorkspace!())}
+          {actions.openFolder &&
+            item('Open Folder…', 'folder-opened', () => actions.openFolder!())}
+          {actions.cloneRepository &&
+            item('Clone Repository…', 'repo-clone', () => actions.cloneRepository!())}
+        </>
+      )}
 
       {isRootish && actions.closeRoot && (
         <>
           <div className="menu-dropdown-sep" />
-          {menuItem('Close Folder', 'close', () => run(() => actions.closeRoot!(ctx.rootIndex)))}
+          {item('Remove Folder from Workspace', 'close', () => actions.closeRoot!(ctx.rootIndex))}
         </>
       )}
-    </div>
+    </ContextMenuPortal>
   );
 }
 
@@ -506,11 +473,8 @@ function WorkspaceRootSection({
   activePath,
   cutPath,
   activeRoot,
-  multi,
   onOpenFile,
   onSelectRoot,
-  onCloseRoot,
-  busy,
   onContextMenu,
   selectedPaths,
   dropTargetDir,
@@ -524,11 +488,8 @@ function WorkspaceRootSection({
   activePath: string | null;
   cutPath?: string | null;
   activeRoot: boolean;
-  multi: boolean;
   onOpenFile: (path: string) => void;
   onSelectRoot: () => void;
-  onCloseRoot?: () => void;
-  busy: boolean;
   onContextMenu: (e: ReactMouseEvent, target: CtxPayload) => void;
   selectedPaths: Set<string>;
   dropTargetDir: string | null;
@@ -536,7 +497,10 @@ function WorkspaceRootSection({
   onDragDropPaths?: (sources: string[], destDirEncoded: string, copy: boolean) => void;
   onDropTargetChange: (dir: string | null) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(activeRoot);
+  useEffect(() => {
+    if (activeRoot) setOpen(true);
+  }, [activeRoot]);
   const encodedForTree = useMemo(() => {
     return filePaths
       .filter((p) => parseDiskPath(p)?.rootIndex === rootIndex)
@@ -587,21 +551,18 @@ function WorkspaceRootSection({
           <span className="explorer-root-label">{label.toUpperCase()}</span>
           {activeRoot && <span className="explorer-root-badge">ACTIVE</span>}
         </button>
-        {multi && onCloseRoot && (
-          <button
-            type="button"
-            className="action explorer-root-close"
-            onClick={onCloseRoot}
-            title={`Close ${label}`}
-            aria-label={`Close ${label}`}
-            disabled={busy}
-          >
-            <span className="codicon codicon-close" aria-hidden />
-          </button>
-        )}
       </div>
       {open && (
-        <div className="file-tree">
+        <div
+          className="file-tree"
+          onContextMenu={(e) => {
+            if ((e.target as HTMLElement).closest('.file-tree-item')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            onSelectRoot();
+            onContextMenu(e, { kind: 'blank', rootIndex });
+          }}
+        >
           {Object.entries(tree).map(([name, node]) => (
             <TreeEntry
               key={name}
@@ -681,6 +642,8 @@ export default function FileTree({
   const trusted = activeRoot && isRootTrusted ? isRootTrusted(activeRoot) : true;
 
   const openCtx = (e: ReactMouseEvent, target: CtxPayload) => {
+    e.preventDefault();
+    e.stopPropagation();
     setCtx({ ...target, x: e.clientX, y: e.clientY } as CtxTarget);
   };
 
@@ -692,8 +655,23 @@ export default function FileTree({
     onNewFolderInDir?.(dirPath);
   };
 
+  const openBlankAreaMenu = (e: ReactMouseEvent) => {
+    if (workspaceRoots.length === 0) return;
+    const t = e.target as HTMLElement;
+    if (
+      t.closest(
+        '.file-tree-item, .explorer-root-toggle, button, a, input, select, textarea, .explorer-empty',
+      )
+    ) {
+      return;
+    }
+    e.preventDefault();
+    openCtx(e, { kind: 'blank', rootIndex: activeRootIndex });
+  };
+
   return (
     <>
+      <div className={`file-tree-panel ${embedded ? 'file-tree-panel-embedded' : ''}`}>
       <div className={`side-bar-title ${embedded ? 'embedded' : ''}`}>
         {!embedded && <span>EXPLORER</span>}
         <div className="side-bar-actions">
@@ -740,18 +718,6 @@ export default function FileTree({
               >
                 <span className="codicon codicon-folder-library" aria-hidden />
               </button>
-              {onCloseFolder && (
-                <button
-                  type="button"
-                  className="action"
-                  onClick={() => onCloseFolder()}
-                  title="Close All Folders"
-                  aria-label="Close All Folders"
-                  disabled={busy}
-                >
-                  <span className="codicon codicon-close-all" aria-hidden />
-                </button>
-              )}
             </>
           )}
           <button
@@ -797,7 +763,10 @@ export default function FileTree({
         </div>
       )}
 
-      <div className="side-bar-scroll">
+      <div
+        className="side-bar-scroll file-tree-scroll"
+        onContextMenu={openBlankAreaMenu}
+      >
         {empty && !hideEmptyWelcome && (
           <ExplorerWelcome
             onOpenFolder={onOpenFolder}
@@ -816,11 +785,8 @@ export default function FileTree({
               activePath={activePath}
               cutPath={cutExplorerPath}
               activeRoot={i === activeRootIndex}
-              multi={workspaceRoots.length > 1}
               onOpenFile={onOpenFile}
               onSelectRoot={() => onSelectRoot(i)}
-              onCloseRoot={onCloseFolder ? () => onCloseFolder(i) : undefined}
-              busy={busy}
               onContextMenu={openCtx}
               selectedPaths={selectedPaths}
               dropTargetDir={dropTargetDir}
@@ -852,8 +818,9 @@ export default function FileTree({
           </div>
         )}
       </div>
+      </div>
 
-      {ctx && diskMode && (
+      {ctx && (
         <ExplorerContextMenu
           ctx={ctx}
           onClose={() => setCtx(null)}
@@ -874,6 +841,9 @@ export default function FileTree({
             findInFolder: onFindInFolder,
             refresh: onRefresh,
             closeRoot: onCloseFolder,
+            addFolderToWorkspace: onAddFolder,
+            openFolder: onOpenFolder,
+            cloneRepository: onCloneRepository,
           }}
         />
       )}

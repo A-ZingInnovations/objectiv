@@ -1,4 +1,7 @@
 import CodeEditor, { type EditorSettingsProps } from './Editor';
+import XmlTextViewer from './XmlTextViewer';
+import { isXmlPath } from '../xmlStructure';
+import type { LlmAssistSettings } from '../llmDocumentAssist';
 import MarkdownViewer from './MarkdownViewer';
 import NotebookViewer from './NotebookViewer';
 import PdfViewer from './PdfViewer';
@@ -25,6 +28,11 @@ export type DocumentPaneProps = EditorSettingsProps & {
   onOpenExternal?: () => void;
   onSqliteDirty?: () => void;
   onPersistDatabase?: (data: Uint8Array) => Promise<void>;
+  formatJsonOnOpen?: boolean;
+  xmlShowStructurePanel?: boolean;
+  llmAssist?: LlmAssistSettings | null;
+  llmInlineCompletions?: boolean;
+  llmInstantFixes?: boolean;
 };
 
 export default function DocumentPane(props: DocumentPaneProps) {
@@ -144,6 +152,25 @@ export default function DocumentPane(props: DocumentPaneProps) {
     );
   }
 
+  if (isXmlPath(props.path) || props.language === 'xml') {
+    return (
+      <XmlTextViewer
+        path={props.path}
+        value={props.value}
+        onChange={props.onChange}
+        language={props.language}
+        workspaceRoot={props.workspaceRoot}
+        diagnostics={props.diagnostics}
+        scrollToLine={props.scrollToLine}
+        showStructurePanel={props.xmlShowStructurePanel !== false}
+        llmAssist={props.llmAssist}
+        llmInlineCompletions={props.llmInlineCompletions}
+        llmInstantFixes={props.llmInstantFixes}
+        {...editorSettings}
+      />
+    );
+  }
+
   return (
     <CodeEditor
       path={props.path}
@@ -155,6 +182,9 @@ export default function DocumentPane(props: DocumentPaneProps) {
       diagnostics={props.diagnostics}
       scrollToLine={props.scrollToLine}
       onToggleBreakpoint={props.onToggleBreakpoint}
+      llmAssist={props.llmAssist}
+      llmInlineCompletions={props.llmInlineCompletions}
+      llmInstantFixes={props.llmInstantFixes}
       {...editorSettings}
     />
   );

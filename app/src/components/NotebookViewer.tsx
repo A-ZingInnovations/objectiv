@@ -1,27 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import DOMPurify from 'dompurify';
-import { marked } from 'marked';
-import {
-  clearCellOutputs,
-  mimeFromData,
-  outputText,
-  parseNotebook,
-  serializeNotebook,
-  setCellOutputs,
-  sourceToString,
-  updateCellSource,
-  type Notebook,
-  type NotebookOutput,
-} from '../notebook/nbformat';
-import { ansiToHtml } from '../notebook/ansi';
-import {
-  isTauriDesktop,
-  notebookKernelEnsure,
-  notebookKernelExec,
-  notebookKernelInterrupt,
-  notebookKernelRestart,
-} from '../desktopWorkspace';
+import {marked} from 'marked';
+import {clearCellOutputs, mimeFromData, outputText, parseNotebook, serializeNotebook, setCellOutputs, sourceToString, updateCellSource, type Notebook, type NotebookOutput} from '../notebook/nbformat';
+import {ansiToHtml} from '../notebook/ansi';
+import {isElectronDesktop, notebookKernelEnsure, notebookKernelExec, notebookKernelInterrupt, notebookKernelRestart} from '../desktopWorkspace';
 
 type Props = {
   path: string;
@@ -85,7 +68,7 @@ export default function NotebookViewer({
   );
 
   useEffect(() => {
-    if (!isTauriDesktop() || !workspaceRoot) {
+    if (!isElectronDesktop() || !workspaceRoot) {
       setKernelReady(false);
       return;
     }
@@ -117,7 +100,7 @@ export default function NotebookViewer({
       const cell = nb.cells[index];
       if (!cell || cell.cell_type !== 'code') return nb;
       const root = stateRef.current.workspaceRoot;
-      if (!root || !isTauriDesktop()) {
+      if (!root || !isElectronDesktop()) {
         setKernelError('Notebook execution requires the Objectiv desktop app and an open folder.');
         setStatuses((s) => ({ ...s, [index]: 'error' }));
         return nb;

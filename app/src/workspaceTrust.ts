@@ -1,5 +1,5 @@
 const TRUST_KEY = 'objectiv-trusted-workspaces-v1';
-const LEGACY_TRUST_KEY = 'aziai-trusted-workspaces-v1';
+const LEGACY_TRUST_KEY = 'objectiv-legacy-trusted-workspaces-v1';
 
 export function loadTrustedRoots(): string[] {
   try {

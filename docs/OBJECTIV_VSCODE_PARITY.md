@@ -34,13 +34,13 @@ Status bar shows **folder name** and warns if sidecar `CODEX_WORKSPACE` ≠ open
 
 - Skips `node_modules`, `.git`, `target`, `dist`, large files (&gt;512KB)
 - Cap ~2000 indexed files per folder
-- Web-only Objectiv (Vite without Tauri) stays on **demo workspace**
+- Web-only Objectiv (Vite without Electron desktop) stays on **demo workspace**
 
 ### Code map
 
 | Piece | Path |
 |-------|------|
-| Tauri scan/read/write | `desktop/src-tauri/src/workspace.rs` |
+| Electron scan/read/write | `electron/src/main/ipc/workspace.ts` |
 | Frontend API | `app/src/desktopWorkspace.ts` |
 | App state | `app/src/App.tsx` |
 | Explorer actions | `app/src/components/FileTree.tsx` |
@@ -71,7 +71,7 @@ Still **not** in Objectiv shell alone: cloud Settings Sync, universal account si
 - **Keyboard shortcuts** — `Cmd+Shift+E/F/G/D/X/A`, `Cmd+,`, `` Ctrl+` ``, `Cmd+O` (open file), `Cmd+Shift+O` (open folder), `Cmd+T` (symbols), `Shift+Alt+F` (format)
 - **Run and Debug** — shell launch + **Node debug** (`--inspect-brk`) with gutter breakpoints
 - **Diff editor** — agent approve flow → **Open diff** tab (Monaco diff)
-- **Language services** — Monaco workers + **typescript-language-server** over Tauri stdio (TS/JS hover/complete)
+- **Language services** — Monaco workers + **typescript-language-server** over Electron main-stdio (TS/JS hover/complete)
 - **Multi-root** — File → Add Folder to Workspace (`@0/path` encoding)
 - **Workspace trust** — trust prompt on first open; persisted locally
 - **Extensions** — Marketplace, **Open VSX**, Objective, open in VS Code
@@ -85,7 +85,7 @@ Still **not** in Objectiv shell alone: cloud Settings Sync, universal account si
 - **Languages** — broader `pathToLanguage` map (TS/JS, Python, Rust, Go, YAML, Markdown, …)
 - **Tasks** — Run panel lists `npm run …` from `package.json` + default Cargo tasks; palette **Run Test** / **Run Build**
 - **Bottom panel** — Terminal, Problems, Output (VS Code layout); **`Ctrl+` `** toggles terminal panel; opens at bottom when you open a folder
-- **Open Folder** — File → Open Folder…, **`⌘⇧O`**, explorer welcome + toolbar; desktop uses Tauri folder picker (`isTauri` detection)
+- **Open Folder** — File → Open Folder…, **`⌘⇧O`**, explorer welcome + toolbar; desktop uses the Electron folder picker (`isElectronDesktop()` detection)
 - **Open File** — **`⌘O`** (desktop), maps path into workspace roots
 - **Output channel** — Run/tasks log to bottom **Output** tab; resizable panel height in Settings
 - **Go to Symbol** — **`⌘T`** over indexed open/workspace files
@@ -114,7 +114,7 @@ Still **not** in Objectiv shell alone: cloud Settings Sync, universal account si
 
 - Desktop spawns **OpenVSCode Server** on the workspace folder (default port **9888**)
 - **Extensions** panel → start / embed / browser; full VS Code extension marketplace
-- Install server: `bash aziai/scripts/install-openvscode-server.sh`
+- Install server: `bash scripts/install-openvscode-server.sh`
 
 ## Objective / G1
 

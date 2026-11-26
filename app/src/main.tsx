@@ -6,7 +6,7 @@ import ExplorerHarness from './e2e/ExplorerHarness';
 import RunPanelHarness from './e2e/RunPanelHarness';
 import MessagingPanel from './components/MessagingPanel';
 import TerminalPopoutApp from './components/TerminalPopoutApp';
-import { loadSettings } from './aziaiSettings';
+import { loadSettings } from './objectivSettings';
 import { applyWorkbenchAppearance } from './objectivThemes';
 import { SettingsProvider } from './settingsContext';
 import { isTerminalSurface } from './terminalPopout';

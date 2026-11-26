@@ -4,7 +4,7 @@ type Props = {
   title: string;
   count?: number;
   open: boolean;
-  onToggle: () => void;
+  onToggle?: () => void;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;

@@ -1,5 +1,5 @@
-import { isTauriDesktop } from '../desktopWorkspace';
-import { useObjectivOpenVsCodeWebview } from '../useObjectivOpenVsCodeWebview';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {useObjectivOpenVsCodeWebview} from '../useObjectivOpenVsCodeWebview';
 
 type Props = {
   url: string;
@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default function OpenVsCodeFrame({ url, active = true, onBack }: Props) {
-  const useNative = isTauriDesktop();
+  const useNative = isElectronDesktop();
   const hostRef = useObjectivOpenVsCodeWebview(url, useNative && active);
 
   return (

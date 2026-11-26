@@ -27,3 +27,8 @@ export function canUseMeetingsIntegration(edition: ObjectivEdition): boolean {
 export function canUseFullMarketplace(edition: ObjectivEdition): boolean {
   return edition === 'enterprise';
 }
+
+/** Billion Context (bili), SCM vulnerability scans, and related org-network services. */
+export function canUseProfessionalNetworkFeatures(edition: ObjectivEdition): boolean {
+  return edition === 'enterprise';
+}

@@ -1,0 +1,28 @@
+{
+  "name": "objectiv-electron",
+  "productName": "Objectiv",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && bash ../scripts/ensure-electron-binary.sh && electron .",
+    "start": "bash ../scripts/ensure-electron-binary.sh && electron ."
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "electron": "^35.7.5",
+    "node-pty": "^1.0.0",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.2",
+    "typescript": "~5.6.3"
+  },
+  "allowScripts": {
+    "electron@35.7.5": true,
+    "node-pty@1.1.0": true
+  }
+}

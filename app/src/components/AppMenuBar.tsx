@@ -5,6 +5,7 @@ import { useObjectivSettings } from '../settingsContext';
 
 export type MenuActions = {
   openFolder: () => void;
+  cloneRepository: () => void;
   openFile: () => void;
   addFolderToWorkspace: () => void;
   closeFolder: () => void;
@@ -18,7 +19,7 @@ export type MenuActions = {
 };
 
 type Props = MenuActions & {
-  /** Hide when native Tauri menu handles the same actions (macOS menu bar). */
+  /** Hide when the native Electron menu handles the same actions (macOS menu bar). */
   hidden?: boolean;
   workspaceOpen?: boolean;
   zoomIn?: () => void;
@@ -36,6 +37,7 @@ const VIEW_ITEMS: { panel: ActivityPanel; label: string }[] = [
   { panel: 'scm', label: 'Source Control' },
   { panel: 'problems', label: 'Problems' },
   { panel: 'run', label: 'Run and Debug' },
+  { panel: 'testing', label: 'Testing' },
   { panel: 'extensions', label: 'Extensions' },
   { panel: 'chat', label: 'Objective Agent' },
   { panel: 'llm', label: 'LLM Suite' },
@@ -46,6 +48,7 @@ const VIEW_ITEMS: { panel: ActivityPanel; label: string }[] = [
 export default function AppMenuBar({
   hidden,
   openFolder,
+  cloneRepository,
   openFile,
   addFolderToWorkspace,
   closeFolder,
@@ -121,6 +124,7 @@ export default function AppMenuBar({
               <>
                 {item('Open File…', openFile)}
                 {item('Open Folder…', openFolder)}
+                {item('Clone Repository…', cloneRepository)}
                 {item('Add Folder to Workspace…', addFolderToWorkspace)}
                 {item('Close All Folders', closeFolder, !workspaceOpen)}
                 <div className="menu-dropdown-sep" />
@@ -260,7 +264,7 @@ export default function AppMenuBar({
                 {item('Open Settings…', () => showPanel('settings'))}
                 {item('Use VS Code / Cursor for cloud account…', () => {
                   void openExternal(
-                    'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
+                    'https://github.com/A-ZingInnovations/objectiv/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
                   );
                 })}
               </>
@@ -283,7 +287,7 @@ export default function AppMenuBar({
               <>
                 {item('VS Code parity doc', () => {
                   void openExternal(
-                    'https://github.com/A-ZingInnovations/aziai/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
+                    'https://github.com/A-ZingInnovations/objectiv/blob/main/docs/OBJECTIV_VSCODE_PARITY.md',
                   );
                 })}
                 {item('Objective extension', () => {

@@ -1,17 +1,32 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
+/**
+ * Editor.tsx — VS Code-style editor with full feature set:
+ * - Monaco editor core
+ * - LSP integration (completion, hover, definition, references, rename, code actions, symbols)
+ * - Find/replace in file
+ * - Breakpoints & diagnostics
+ * - Outline view hook
+ * - Terminal link decoration
+ */
+
+import {useEffect, useRef, type MutableRefObject} from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import type * as Monaco from 'monaco-editor';
-import { ensurePythonLsp, ensureTypeScriptLsp } from '../lspClient';
+import * as Monaco from 'monaco-editor';
+import {ensurePythonLsp, ensureTypeScriptLsp} from '../lspClient';
+import {toMonacoDocumentSymbols} from '../lspEditor';
+import {registerEditorInstance, unregisterEditorInstance} from '../editorCommands';
 import type { FileDiagnostic } from '../diagnostics';
-import { isDiskPath, resolveDiskRel } from '../workspaceDisk';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {isDiskPath, resolveDiskRel} from '../workspaceDisk';
+import {isElectronDesktop} from '../desktopWorkspace';
 import type {
   CursorBlinkingSetting,
   CursorStyleSetting,
   LineNumbersSetting,
   RenderWhitespaceSetting,
   WordWrapSetting,
-} from '../aziaiSettings';
+} from '../objectivSettings';
+import {attachEditorMultiFind} from '../editorMultiFind';
+import type { LlmAssistSettings } from '../llmDocumentAssist';
+import {attachLlmEditorAssist} from '../llmEditorAssist';
 
 export type EditorSettingsProps = {
   fontSize?: number;
@@ -46,6 +61,9 @@ type Props = EditorSettingsProps & {
   diagnostics?: FileDiagnostic[];
   scrollToLine?: number | null;
   onToggleBreakpoint?: (path: string, line: number) => void;
+  llmAssist?: LlmAssistSettings | null;
+  llmInlineCompletions?: boolean;
+  llmInstantFixes?: boolean;
 };
 
 export default function CodeEditor({
@@ -78,40 +96,131 @@ export default function CodeEditor({
   formatOnType = false,
   scrollToLine = null,
   onToggleBreakpoint,
+  llmAssist,
+  llmInlineCompletions = false,
+  llmInstantFixes = false,
 }: Props) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof Monaco | null>(null);
   const decoRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const searchHitDecoRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const lspReadyRef = useRef(false);
+  const llmAssistDisposeRef = useRef<(() => void) | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
   const ignoreEmptyUntilRef = useRef(0);
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    registerEditorInstance(path, editor, monaco, workspaceRoot ?? null);
     editor.updateOptions({ glyphMargin: true });
+    attachEditorMultiFind(editor, monaco);
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Backslash, () => {
       window.dispatchEvent(new CustomEvent('objectiv:toggle-split'));
     });
 
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.F, () => {
+      editor.getAction('editor.action.find')?.run();
+    });
+
     editor.addCommand(
-      monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
       () => {
-        void editor.getAction('editor.action.formatDocument')?.run();
+        editor.getAction('editor.action.formatDocument')?.run();
       },
     );
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD, () => {
+      const sel = editor.getSelection();
+      if (!sel) return;
+      const model = editor.getModel();
+      if (!model) return;
+      const word = model.getWordAtPosition({
+        lineNumber: sel.startLineNumber,
+        column: sel.startColumn,
+      });
+      if (!word) return;
+      editor.executeEdits('', [
+        {
+          range: new Monaco.Selection(
+            sel.startLineNumber,
+            sel.startColumn,
+            sel.endLineNumber,
+            sel.endColumn
+          ),
+          text: word.word,
+        },
+      ]);
+    });
+
+    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyJ, () => {
+      const sel = editor.getSelection();
+      if (!sel) return;
+      const model = editor.getModel();
+      if (!model) return;
+      const word = model.getWordAtPosition({
+        lineNumber: sel.startLineNumber,
+        column: sel.startColumn,
+      });
+      if (!word) return;
+      const ranges: Monaco.Selection[] = [];
+      const lineCount = model.getLineCount();
+      for (let line = 1; line <= lineCount; line++) {
+        const text = model.getLineContent(line);
+        let idx = text.indexOf(word.word);
+        while (idx !== -1) {
+          ranges.push(
+            new Monaco.Selection(line, idx + 1, line, idx + word.word.length + 1)
+          );
+          idx = text.indexOf(word.word, idx + 1);
+        }
+      }
+      editor.setSelections(ranges);
+    });
 
     const onFormat = (ev: Event) => {
       const detail = (ev as CustomEvent<{ path?: string }>).detail;
       if (detail?.path && detail.path !== path) return;
-      void editor.getAction('editor.action.formatDocument')?.run();
+      editor.getAction('editor.action.formatDocument')?.run();
     };
     window.addEventListener('objectiv:format-document', onFormat);
     editor.onDidDispose(() => window.removeEventListener('objectiv:format-document', onFormat));
 
-    editor.onMouseDown((e) => {
-      if (!onToggleBreakpoint) return;
+    // Editor feature commands dispatched from the command palette:
+    // "rename", "quickfix", "definition", "references", "find"
+    const onEditorAction = (ev: Event) => {
+      const actionId = (ev as CustomEvent<{ action: string; path?: string }>).detail?.action;
+      const actionPath = (ev as CustomEvent<{ action: string; path?: string }>).detail?.path;
+      if (actionPath && actionPath !== path) return;
+      if (!actionId) return;
+      const id =
+        actionId === 'rename'
+          ? 'editor.action.rename'
+          : actionId === 'quickfix'
+            ? 'editor.action.triggerCodeAction'
+            : actionId === 'definition'
+              ? 'editor.action.revealDefinition'
+              : actionId === 'references'
+                ? 'editor.action.referenceSelection'
+                : 'editor.action.find';
+      const action = editor.getAction(id);
+      if (!action) return;
+      if (actionId === 'quickfix') {
+        action.run({ codeActionKind: monaco.CodeActionKind.QuickFix });
+      } else {
+        void action.run();
+      }
+    };
+    window.addEventListener('objectiv:editor-action', onEditorAction);
+    editor.onDidDispose(() => {
+      unregisterEditorInstance(path, editor);
+      window.removeEventListener('objectiv:editor-action', onEditorAction);
+    });
+
+    editor.onMouseDown((e: any) => {
+      if (e.button !== 0 || !onToggleBreakpoint) return;
       const target = e.target;
       if (
         target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
@@ -124,6 +233,25 @@ export default function CodeEditor({
 
     void setupLsp(editor, monaco, path, value, workspaceRoot ?? null, lspReadyRef);
 
+    llmAssistDisposeRef.current?.();
+    if (llmAssist && (llmInlineCompletions || llmInstantFixes)) {
+      llmAssistDisposeRef.current = attachLlmEditorAssist(editor, monaco, {
+        path,
+        language,
+        getContent: () => valueRef.current,
+        settings: llmAssist,
+        inlineCompletions: llmInlineCompletions,
+        instantFixes: llmInstantFixes,
+      });
+    } else {
+      llmAssistDisposeRef.current = null;
+    }
+    editor.onDidDispose(() => {
+      unregisterEditorInstance(path, editor);
+      llmAssistDisposeRef.current?.();
+      llmAssistDisposeRef.current = null;
+    });
+
     if (scrollToLine != null) {
       editor.revealLineInCenter(scrollToLine);
       editor.setPosition({ lineNumber: scrollToLine, column: 1 });
@@ -131,7 +259,9 @@ export default function CodeEditor({
   };
 
   useEffect(() => {
-    editorRef.current?.updateOptions({
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.updateOptions({
       fontSize,
       fontFamily,
       fontLigatures,
@@ -285,6 +415,25 @@ export default function CodeEditor({
     })();
   }, [value, path, workspaceRoot]);
 
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = (window as unknown as { monaco?: typeof Monaco }).monaco;
+    if (!editor || !monaco) return;
+    llmAssistDisposeRef.current?.();
+    if (llmAssist && (llmInlineCompletions || llmInstantFixes)) {
+      llmAssistDisposeRef.current = attachLlmEditorAssist(editor, monaco, {
+        path,
+        language,
+        getContent: () => valueRef.current,
+        settings: llmAssist,
+        inlineCompletions: llmInlineCompletions,
+        instantFixes: llmInstantFixes,
+      });
+    } else {
+      llmAssistDisposeRef.current = null;
+    }
+  }, [path, language, llmAssist, llmInlineCompletions, llmInstantFixes]);
+
   return (
     <div className="code-editor-host">
       <Editor
@@ -327,6 +476,11 @@ export default function CodeEditor({
           formatOnPaste,
           formatOnType,
           guides: { indentation: true, bracketPairs: true },
+          quickSuggestions: {
+            other: true,
+            comments: true,
+            strings: true,
+          },
         }}
       />
     </div>
@@ -341,7 +495,7 @@ async function setupLsp(
   workspaceRoot: string | null,
   lspReadyRef: MutableRefObject<boolean>,
 ) {
-  if (!isTauriDesktop() || !isDiskPath(path) || !workspaceRoot) return;
+  if (!isElectronDesktop() || !isDiskPath(path) || !workspaceRoot) return;
   const rel = resolveDiskRel(path);
   if (!rel) return;
   const lang = rel.split('.').pop()?.toLowerCase();
@@ -376,6 +530,144 @@ async function setupLsp(
         | Monaco.languages.Hover
         | null;
       return result ?? null;
+    },
+  });
+
+  monaco.languages.registerDefinitionProvider(model.getLanguageId(), {
+    provideDefinition: async (_m, position, _token) => {
+      const result = await client.definition(rel, position.lineNumber, position.column);
+      if (!result) return null;
+      const arr = Array.isArray(result) ? result : [result];
+      return arr.map((i: any) => ({
+        uri: monaco.Uri.parse(i.uri ?? rel),
+        range: new monaco.Range(
+          i.range?.startLineNumber ?? 1,
+          i.range?.startColumn ?? 1,
+          i.range?.endLineNumber ?? 1,
+          i.range?.endColumn ?? 1
+        ),
+      }));
+    },
+  });
+
+  monaco.languages.registerReferenceProvider(model.getLanguageId(), {
+    provideReferences: async (_m, position) => {
+      const result = await client.references(rel, position.lineNumber, position.column);
+      if (!result) return null;
+      const arr = Array.isArray(result) ? result : [result];
+      return arr
+        .filter((i: any) => i && typeof i === 'object' && i.range)
+        .map((i: any) => ({
+          uri: monaco.Uri.parse(i.uri ?? rel),
+          range: new monaco.Range(
+            i.range.startLineNumber,
+            i.range.startColumn,
+            i.range.endLineNumber,
+            i.range.endColumn
+          ),
+        }));
+    },
+  });
+
+  monaco.languages.registerRenameProvider(model.getLanguageId(), {
+    provideRenameEdits: async (_m, position, newName) => {
+      const result = await client.rename(rel, position.lineNumber, position.column, newName);
+      if (!result) return null;
+      // LSP rename result: { changes: { [uri]: TextEdit[] } }
+      const changes = (result as any).changes ?? {};
+      const edits: Monaco.languages.WorkspaceEdit = {
+        edits: [] as Monaco.languages.IWorkspaceTextEdit[],
+      };
+      for (const [uri, changeList] of Object.entries(changes)) {
+        if (!Array.isArray(changeList)) continue;
+        for (const c of changeList as any[]) {
+          if (!c?.range) continue;
+          edits.edits.push({
+            resource: monaco.Uri.parse(uri),
+            textEdit: {
+              range: new monaco.Range(
+                c.range.startLineNumber,
+                c.range.startColumn,
+                c.range.endLineNumber,
+                c.range.endColumn
+              ),
+              text: c.newText ?? '',
+            },
+            versionId: undefined,
+          });
+        }
+      }
+      return edits;
+    },
+  });
+
+  monaco.languages.registerCodeActionProvider(model.getLanguageId(), {
+    provideCodeActions: async (_m, range, context) => {
+      const result = await client.codeAction(
+        rel,
+        range.startLineNumber,
+        range.startColumn,
+        context.markers,
+      );
+      if (!result) return { actions: [], dispose: () => {} };
+      const arr = Array.isArray(result) ? result : [result];
+      const actions: Monaco.languages.CodeAction[] = [];
+      for (const item of arr) {
+        if (!item || typeof item !== 'object') continue;
+        const title = (item as any).title;
+        if (!title) continue;
+        const kind = (item as any).kind as string | undefined;
+        const lspEdit = (item as any).edit;
+        const cmd = (item as any).command;
+        actions.push({
+          title,
+          kind,
+          edit: lspEdit
+            ? (() => {
+                const we: Monaco.languages.WorkspaceEdit = {
+                  edits: [] as Monaco.languages.IWorkspaceTextEdit[],
+                };
+                for (const [uri, changeList] of Object.entries(
+                  (lspEdit as any).changes ?? {},
+                )) {
+                  if (!Array.isArray(changeList)) continue;
+                  for (const c of changeList as any[]) {
+                    if (!c?.range) continue;
+                    we.edits.push({
+                      resource: monaco.Uri.parse(uri),
+                      textEdit: {
+                        range: new monaco.Range(
+                          c.range.startLineNumber,
+                          c.range.startColumn,
+                          c.range.endLineNumber,
+                          c.range.endColumn
+                        ),
+                        text: c.newText ?? '',
+                      },
+                      versionId: undefined,
+                    });
+                  }
+                }
+                return we;
+              })()
+            : undefined,
+          command: !lspEdit && cmd
+            ? {
+                id: cmd.command ?? title,
+                title: cmd.title ?? title,
+                arguments: cmd.arguments,
+              }
+            : undefined,
+        });
+      }
+      return { actions, dispose: () => {} };
+    },
+  });
+
+  monaco.languages.registerDocumentSymbolProvider(model.getLanguageId(), {
+    provideDocumentSymbols: async (_m) => {
+      const result = await client.documentSymbols(rel);
+      return toMonacoDocumentSymbols(monaco, result);
     },
   });
 }

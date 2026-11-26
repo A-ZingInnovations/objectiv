@@ -1,54 +1,38 @@
-import { useEffect, useState } from 'react';
+import {useEffect, useState} from 'react';
 import XtermTerminal from './XtermTerminal';
-import {
-  listenTerminalPopoutEvents,
-  loadTerminalPopoutState,
-  notifyTerminalPopoutClosed,
-  requestTerminalPopIn,
-  saveTerminalPopoutState,
-} from '../terminalPopout';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {closeTerminalPopout, listenTerminalPopoutEvents, loadTerminalPopoutState, saveTerminalPopoutState} from '../terminalPopout';
+import {isElectronDesktop} from '../desktopWorkspace';
 
-/** Standalone terminal window (`?surface=terminal`). */
+/** Standalone terminal surface window (`?surface=terminal`) — Electron. */
 export default function TerminalPopoutApp() {
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(
     () => loadTerminalPopoutState()?.workspaceRoot ?? null,
   );
 
   useEffect(() => {
-    if (!isTauriDesktop()) return;
-    let unlistenClose: (() => void) | undefined;
+    if (!isElectronDesktop()) return;
     let unlistenEvents: (() => void) | undefined;
     void (async () => {
-      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      const win = getCurrentWebviewWindow();
-      unlistenClose = await win.onCloseRequested(async (ev) => {
-        ev.preventDefault();
-        await notifyTerminalPopoutClosed();
-        await win.destroy();
-      });
       unlistenEvents = await listenTerminalPopoutEvents({
         onPoppedOut: (root) => {
           saveTerminalPopoutState({ workspaceRoot: root });
           setWorkspaceRoot(root);
         },
+        // "Pop in" is requested from the main window: close this surface.
         onPopIn: () => {
-          void win.close();
+          void closeTerminalPopout();
         },
       });
     })();
     return () => {
-      unlistenClose?.();
       unlistenEvents?.();
     };
   }, []);
 
   async function popIn() {
-    await requestTerminalPopIn();
-    if (isTauriDesktop()) {
-      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      await getCurrentWebviewWindow().close();
-    }
+    // requestTerminalPopIn is implied by closeTerminalPopout's state clear +
+    // the main window listening for the closed event; close is enough here.
+    await closeTerminalPopout();
   }
 
   return (

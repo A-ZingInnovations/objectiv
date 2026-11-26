@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import FileTree from './FileTree';
 import SideBarSection from './SideBarSection';
 import ExplorerWelcome from './ExplorerWelcome';
+import ExplorerRemoteSection from './ExplorerRemoteSection';
+import type { RemoteConnection } from '../remoteConnections';
 import FileTypeIcon from './FileTypeIcon';
 import { displayPath } from '../workspaceDisk';
 import { workspaceFolderLabel } from '../desktopWorkspace';
@@ -15,9 +17,12 @@ type Props = FileTreeProps & {
   onActivateEditor: (path: string) => void;
   onCloseEditor: (path: string) => void;
   browserSection?: ReactNode;
+  onConnectRemote?: (conn: RemoteConnection) => void;
+  onScpRemoteHost?: (conn: RemoteConnection) => void;
+  remoteHostsRefreshToken?: number;
 };
 
-type SectionId = 'editors' | 'workspace' | 'browser' | 'outline' | 'timeline';
+type SectionId = 'editors' | 'workspace' | 'browser' | 'remote' | 'outline';
 
 function editorLabel(path: string): string {
   const rel = displayPath(path);
@@ -31,6 +36,9 @@ export default function ExplorerSidePanel({
   onActivateEditor,
   onCloseEditor,
   browserSection,
+  onConnectRemote,
+  onScpRemoteHost,
+  remoteHostsRefreshToken,
   workspaceRoots,
   activeRootIndex,
   ...fileTreeProps
@@ -48,8 +56,8 @@ export default function ExplorerSidePanel({
   const [editorsOpen, setEditorsOpen] = useState(() => editors.length > 0);
   const [workspaceOpen, setWorkspaceOpen] = useState(true);
   const [outlineOpen, setOutlineOpen] = useState(false);
-  const [timelineOpen, setTimelineOpen] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [remoteOpen, setRemoteOpen] = useState(false);
 
   useEffect(() => {
     if (editors.length > 0) setEditorsOpen(true);
@@ -59,14 +67,14 @@ export default function ExplorerSidePanel({
     editors: editorsOpen,
     workspace: workspaceOpen,
     browser: browserOpen,
+    remote: remoteOpen,
     outline: outlineOpen,
-    timeline: timelineOpen,
   };
 
   const sectionOrder: SectionId[] = useMemo(() => {
     const order: SectionId[] = ['editors', 'workspace'];
     if (browserSection) order.push('browser');
-    order.push('outline', 'timeline');
+    order.push('remote', 'outline');
     return order;
   }, [browserSection]);
 
@@ -74,11 +82,11 @@ export default function ExplorerSidePanel({
     ? 'workspace'
     : browserSection && browserOpen
       ? 'browser'
+      : remoteOpen
+        ? 'remote'
       : outlineOpen
         ? 'outline'
-        : timelineOpen
-          ? 'timeline'
-          : editorsOpen
+        : editorsOpen
             ? 'editors'
             : null;
 
@@ -132,14 +140,21 @@ export default function ExplorerSidePanel({
         );
       case 'browser':
         return browserSection;
+      case 'remote':
+        return (
+          <ExplorerRemoteSection
+            onAddHost={fileTreeProps.onConnectHost}
+            onConnect={onConnectRemote}
+            onScpCopy={onScpRemoteHost}
+            refreshToken={remoteHostsRefreshToken}
+          />
+        );
       case 'outline':
         return (
           <p className="sidebar-section-empty">
             The active editor cannot provide outline information.
           </p>
         );
-      case 'timeline':
-        return <p className="sidebar-section-empty">No timeline events</p>;
       default:
         return null;
     }
@@ -151,15 +166,15 @@ export default function ExplorerSidePanel({
     }
     if (id === 'editors') return 'Open Editors';
     if (id === 'browser') return 'Browser';
-    if (id === 'outline') return 'Outline';
-    return 'Timeline';
+    if (id === 'remote') return 'Remote';
+    return 'Outline';
   }
 
   function sectionClass(id: SectionId): string {
     if (id === 'workspace') return 'explorer-workspace-section';
     if (id === 'browser') return 'explorer-browser-section';
+    if (id === 'remote') return 'explorer-remote-section';
     if (id === 'outline') return 'explorer-outline-section';
-    if (id === 'timeline') return 'explorer-timeline-section';
     return '';
   }
 
@@ -167,8 +182,8 @@ export default function ExplorerSidePanel({
     if (id === 'editors') setEditorsOpen((v) => !v);
     else if (id === 'workspace') setWorkspaceOpen((v) => !v);
     else if (id === 'browser') setBrowserOpen((v) => !v);
-    else if (id === 'outline') setOutlineOpen((v) => !v);
-    else setTimelineOpen((v) => !v);
+    else if (id === 'remote') setRemoteOpen((v) => !v);
+    else setOutlineOpen((v) => !v);
   }
 
   return (

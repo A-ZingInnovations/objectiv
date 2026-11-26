@@ -1,0 +1,400 @@
+{
+  "version": 1,
+  "projects": {
+    "proj-1795695710164-nlduhj": {
+      "id": "proj-1795695710164-nlduhj",
+      "name": "Objectiv — Agent Execution",
+      "createdAt": 1795695710164,
+      "updatedAt": 1795695710164
+    }
+  },
+  "sessions": {
+    "sess-1795695710169-ynb103": {
+      "id": "sess-1795695710169-ynb103",
+      "projectId": "proj-1795695710164-nlduhj",
+      "name": "implementation-plan",
+      "startedAt": 1795695710169
+    }
+  },
+  "agents": {},
+  "tasks": {
+    "task-1795695710169-ltz0xz": {
+      "id": "task-1795695710169-ltz0xz",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 1 — Tracking engine core",
+      "status": "verified",
+      "priority": "high",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710169,
+      "updatedAt": 1795695710170,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710170-doa7gq": {
+      "id": "task-1795695710170-doa7gq",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 2 — Dashboard shell",
+      "status": "verified",
+      "priority": "high",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710170,
+      "updatedAt": 1795695710171,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710171-lrtxnt": {
+      "id": "task-1795695710171-lrtxnt",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 3 — Project Overview",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710171,
+      "updatedAt": 1795695710171,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710172-oy23by": {
+      "id": "task-1795695710172-oy23by",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 4 — Task Management",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710172,
+      "updatedAt": 1795695710172,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710173-up7o50": {
+      "id": "task-1795695710173-up7o50",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 5 — Agent Monitor",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710173,
+      "updatedAt": 1795695710173,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710174-am0n3i": {
+      "id": "task-1795695710174-am0n3i",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 6 — File Monitor",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710174,
+      "updatedAt": 1795695710174,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710174-fqm54d": {
+      "id": "task-1795695710174-fqm54d",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 7 — Execution Timeline",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710174,
+      "updatedAt": 1795695710175,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710175-j21u97": {
+      "id": "task-1795695710175-j21u97",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 8 — Testing & Verification",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710175,
+      "updatedAt": 1795695710175,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710175-7d5ofy": {
+      "id": "task-1795695710175-7d5ofy",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 9 — Claude Code adapter",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710175,
+      "updatedAt": 1795695710175,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    },
+    "task-1795695710175-tzkav7": {
+      "id": "task-1795695710175-tzkav7",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "title": "Milestone 10 — Additional adapters (Codex, Cursor) + E2E demonstration",
+      "status": "verified",
+      "priority": "medium",
+      "progress": 0,
+      "verified": true,
+      "dependsOn": [],
+      "createdAt": 1795695710175,
+      "updatedAt": 1795695710176,
+      "verificationEvidence": "Marked DONE in IMPLEMENTATION_STATUS.md"
+    }
+  },
+  "subtasks": {},
+  "events": [
+    {
+      "id": "evt-1795695710164-ptcargqp",
+      "type": "PROJECT_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "",
+      "timestamp": 1795695710164,
+      "payload": {
+        "name": "Objectiv — Agent Execution"
+      }
+    },
+    {
+      "id": "evt-1795695710169-flla4p6e",
+      "type": "SESSION_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710169,
+      "payload": {
+        "name": "implementation-plan"
+      }
+    },
+    {
+      "id": "evt-1795695710169-nd8kwskg",
+      "type": "PLAN_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "payload": {
+        "source": "IMPLEMENTATION_STATUS.md",
+        "milestoneCount": 10
+      },
+      "timestamp": 1795695710169
+    },
+    {
+      "id": "evt-1795695710169-kw4f4r47",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710169,
+      "payload": {
+        "id": "task-1795695710169-ltz0xz",
+        "title": "Milestone 1 — Tracking engine core",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710170-2m0u0ezb",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710170,
+      "payload": {
+        "id": "task-1795695710170-doa7gq",
+        "title": "Milestone 2 — Dashboard shell",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710171-kodlox65",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710171,
+      "payload": {
+        "id": "task-1795695710171-lrtxnt",
+        "title": "Milestone 3 — Project Overview",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710172-z8fv0fl7",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710172,
+      "payload": {
+        "id": "task-1795695710172-oy23by",
+        "title": "Milestone 4 — Task Management",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710173-ygk1z6el",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710173,
+      "payload": {
+        "id": "task-1795695710173-up7o50",
+        "title": "Milestone 5 — Agent Monitor",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710174-kaauiksa",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710174,
+      "payload": {
+        "id": "task-1795695710174-am0n3i",
+        "title": "Milestone 6 — File Monitor",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710174-1dshkmyu",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710174,
+      "payload": {
+        "id": "task-1795695710174-fqm54d",
+        "title": "Milestone 7 — Execution Timeline",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710175-5alqt992",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710175,
+      "payload": {
+        "id": "task-1795695710175-j21u97",
+        "title": "Milestone 8 — Testing & Verification",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710175-j0g69a1s",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710175,
+      "payload": {
+        "id": "task-1795695710175-7d5ofy",
+        "title": "Milestone 9 — Claude Code adapter",
+        "status": "planned"
+      }
+    },
+    {
+      "id": "evt-1795695710175-v2fxjstb",
+      "type": "TASK_CREATED",
+      "projectId": "proj-1795695710164-nlduhj",
+      "sessionId": "sess-1795695710169-ynb103",
+      "timestamp": 1795695710175,
+      "payload": {
+        "id": "task-1795695710175-tzkav7",
+        "title": "Milestone 10 — Additional adapters (Codex, Cursor) + E2E demonstration",
+        "status": "planned"
+      }
+    }
+  ],
+  "fileChanges": [],
+  "verificationResults": [
+    {
+      "id": "verify-1795695710170-ksne8t",
+      "taskId": "task-1795695710169-ltz0xz",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710170
+    },
+    {
+      "id": "verify-1795695710171-3ef0fa",
+      "taskId": "task-1795695710170-doa7gq",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710171
+    },
+    {
+      "id": "verify-1795695710171-6tr4gw",
+      "taskId": "task-1795695710171-lrtxnt",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710171
+    },
+    {
+      "id": "verify-1795695710172-7noenx",
+      "taskId": "task-1795695710172-oy23by",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710172
+    },
+    {
+      "id": "verify-1795695710173-shbbpl",
+      "taskId": "task-1795695710173-up7o50",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710173
+    },
+    {
+      "id": "verify-1795695710174-krnrxl",
+      "taskId": "task-1795695710174-am0n3i",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710174
+    },
+    {
+      "id": "verify-1795695710174-n1rjn9",
+      "taskId": "task-1795695710174-fqm54d",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710174
+    },
+    {
+      "id": "verify-1795695710175-cby9j1",
+      "taskId": "task-1795695710175-j21u97",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710175
+    },
+    {
+      "id": "verify-1795695710175-hpacwi",
+      "taskId": "task-1795695710175-7d5ofy",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710175
+    },
+    {
+      "id": "verify-1795695710176-nbhtg4",
+      "taskId": "task-1795695710175-tzkav7",
+      "type": "build",
+      "status": "passed",
+      "evidence": "Documented in IMPLEMENTATION_STATUS.md",
+      "timestamp": 1795695710176
+    }
+  ],
+  "blockers": {}
+}

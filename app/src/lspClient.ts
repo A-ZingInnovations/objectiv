@@ -1,5 +1,5 @@
-import { isTauriDesktop } from './desktopWorkspace';
-import { pathToLanguage } from './workspace';
+import {isElectronDesktop, nativeInvoke, nativeListen} from './desktopBridge';
+import {pathToLanguage} from './workspace';
 
 type JsonRpc = {
   jsonrpc: '2.0';
@@ -29,16 +29,14 @@ export class LspClient {
   ) {}
 
   async start(): Promise<void> {
-    if (!isTauriDesktop()) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    const { listen } = await import('@tauri-apps/api/event');
-    await invoke('lsp_start', {
+    if (!isElectronDesktop()) return;
+    await nativeInvoke('lsp_start', {
       sessionId: this.sessionId,
       root: this.root,
       language: this.language,
     });
-    this.unlisten = await listen<string>(`lsp://${this.sessionId}`, (e) => {
-      this.onRawMessage(e.payload);
+    this.unlisten = await nativeListen<string>(`lsp://${this.sessionId}`, (body) => {
+      this.onRawMessage(body);
     });
     await this.request('initialize', {
       processId: null,
@@ -57,11 +55,10 @@ export class LspClient {
   }
 
   async stop(): Promise<void> {
-    if (!isTauriDesktop()) return;
+    if (!isElectronDesktop()) return;
     this.unlisten?.();
     this.unlisten = undefined;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('lsp_stop', { sessionId: this.sessionId });
+    await nativeInvoke('lsp_stop', { sessionId: this.sessionId });
     this.ready = false;
   }
 
@@ -112,6 +109,56 @@ export class LspClient {
     });
   }
 
+  async definition(relPath: string, line: number, character: number): Promise<unknown> {
+    if (!this.ready) return null;
+    return this.request('textDocument/definition', {
+      textDocument: { uri: this.uriForRelPath(relPath) },
+      position: { line: line - 1, character: character - 1 },
+    });
+  }
+
+  async references(relPath: string, line: number, character: number): Promise<unknown> {
+    if (!this.ready) return null;
+    return this.request('textDocument/references', {
+      textDocument: { uri: this.uriForRelPath(relPath) },
+      position: { line: line - 1, character: character - 1 },
+      context: { includeDeclaration: true },
+    });
+  }
+
+  async rename(relPath: string, line: number, character: number, newName: string): Promise<unknown> {
+    if (!this.ready) return null;
+    return this.request('textDocument/rename', {
+      textDocument: { uri: this.uriForRelPath(relPath) },
+      position: { line: line - 1, character: character - 1 },
+      newName,
+    });
+  }
+
+  async codeAction(
+    relPath: string,
+    line: number,
+    character: number,
+    diagnostics: unknown[]
+  ): Promise<unknown> {
+    if (!this.ready) return null;
+    return this.request('textDocument/codeAction', {
+      textDocument: { uri: this.uriForRelPath(relPath) },
+      range: {
+        start: { line: line - 1, character: character - 1 },
+        end: { line: line - 1, character: character },
+      },
+      context: { diagnostics },
+    });
+  }
+
+  async documentSymbols(relPath: string): Promise<unknown> {
+    if (!this.ready) return null;
+    return this.request('textDocument/documentSymbol', {
+      textDocument: { uri: this.uriForRelPath(relPath) },
+    });
+  }
+
   private notify(method: string, params: unknown): void {
     void this.send({ jsonrpc: '2.0', method, params });
   }
@@ -125,8 +172,7 @@ export class LspClient {
   }
 
   private async send(msg: JsonRpc): Promise<void> {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('lsp_send', {
+    await nativeInvoke('lsp_send', {
       sessionId: this.sessionId,
       message: JSON.stringify(msg),
     });
@@ -166,7 +212,7 @@ function notifyDiagnosticsListeners(params: unknown): void {
 const clients = new Map<string, LspClient>();
 
 async function ensureLsp(sessionId: string, root: string, language: string): Promise<LspClient | null> {
-  if (!isTauriDesktop()) return null;
+  if (!isElectronDesktop()) return null;
   const existing = clients.get(sessionId);
   if (existing) return existing;
   const client = new LspClient(sessionId, root, language);

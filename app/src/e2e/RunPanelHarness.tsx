@@ -1,4 +1,4 @@
-/** Static Run panel chrome for Playwright (no Tauri workspace). */
+/** Static Run panel chrome for Playwright (no native desktop workspace). */
 export default function RunPanelHarness() {
   return (
     <div className="side-bar run-panel-e2e" data-testid="run-panel-harness">

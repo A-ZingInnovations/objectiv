@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BOTTOM_PANEL_TABS, type BottomPanelTab } from '../bottomPanel';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
+import {BOTTOM_PANEL_TABS, type BottomPanelTab} from '../bottomPanel';
+import {isElectronDesktop} from '../desktopWorkspace';
 
 type Props = {
   open: boolean;
@@ -44,7 +44,7 @@ export default function BottomPanel({
   problems,
   output,
 }: Props) {
-  const isTauri = isTauriDesktop();
+  const isDesktop = isElectronDesktop();
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
   const liveHeightRef = useRef(heightPx);
@@ -158,7 +158,7 @@ export default function BottomPanel({
             ))}
           </div>
           <div className="bottom-panel-actions">
-            {tab === 'terminal' && isTauri && onPopOutTerminal && !terminalPoppedOut && (
+            {tab === 'terminal' && isDesktop && onPopOutTerminal && !terminalPoppedOut && (
               <button
                 type="button"
                 className="bottom-panel-action"

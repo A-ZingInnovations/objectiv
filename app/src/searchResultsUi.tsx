@@ -45,6 +45,8 @@ export function formatSearchPreview(preview: string, maxLen = 140): string {
 
 type HighlightOpts = {
   query: string;
+  /** Literal terms when searching comma-separated strings (non-regex). */
+  terms?: string[];
   matchCase: boolean;
   useRegex: boolean;
   wholeWord: boolean;
@@ -52,7 +54,17 @@ type HighlightOpts = {
 
 export function highlightSearchPreview(preview: string, opts: HighlightOpts): ReactNode {
   const q = opts.query.trim();
-  if (!q) return preview;
+  const literalTerms =
+    !opts.useRegex && opts.terms && opts.terms.length > 0
+      ? opts.terms
+      : q
+        ? [q]
+        : [];
+  if (!literalTerms.length && !q) return preview;
+
+  if (literalTerms.length > 1 || (!opts.useRegex && literalTerms.length === 1)) {
+    return highlightLiteralTerms(preview, literalTerms, opts);
+  }
 
   if (opts.useRegex) {
     try {
@@ -82,31 +94,7 @@ export function highlightSearchPreview(preview: string, opts: HighlightOpts): Re
     }
   }
 
-  const needle = opts.matchCase ? q : q.toLowerCase();
-  const hay = opts.matchCase ? preview : preview.toLowerCase();
-  const nodes: ReactNode[] = [];
-  let i = 0;
-  let key = 0;
-
-  while (i < preview.length) {
-    const idx = hay.indexOf(needle, i);
-    if (idx === -1) break;
-    if (!opts.wholeWord || isWholeWord(hay, idx, needle.length)) {
-      if (idx > i) nodes.push(preview.slice(i, idx));
-      nodes.push(
-        <mark key={key++} className="search-match">
-          {preview.slice(idx, idx + needle.length)}
-        </mark>,
-      );
-      i = idx + needle.length;
-      continue;
-    }
-    i = idx + 1;
-  }
-
-  if (i === 0) return preview;
-  if (i < preview.length) nodes.push(preview.slice(i));
-  return nodes;
+  return preview;
 }
 
 function isWholeWord(hay: string, index: number, len: number): boolean {
@@ -117,4 +105,59 @@ function isWholeWord(hay: string, index: number, len: number): boolean {
 
 function isWordChar(ch: string): boolean {
   return /[\w$]/.test(ch);
+}
+
+function highlightLiteralTerms(
+  preview: string,
+  terms: string[],
+  opts: Pick<HighlightOpts, 'matchCase' | 'wholeWord'>,
+): ReactNode {
+  type Range = { start: number; end: number };
+  const ranges: Range[] = [];
+
+  const hay = opts.matchCase ? preview : preview.toLowerCase();
+
+  for (const term of terms) {
+    const needle = opts.matchCase ? term : term.toLowerCase();
+    if (!needle) continue;
+    let i = 0;
+    while (i < preview.length) {
+      const idx = hay.indexOf(needle, i);
+      if (idx === -1) break;
+      if (!opts.wholeWord || isWholeWord(hay, idx, needle.length)) {
+        ranges.push({ start: idx, end: idx + needle.length });
+        i = idx + needle.length;
+      } else {
+        i = idx + 1;
+      }
+    }
+  }
+
+  if (ranges.length === 0) return preview;
+
+  ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Range[] = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end) {
+      last.end = Math.max(last.end, r.end);
+    } else {
+      merged.push({ ...r });
+    }
+  }
+
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  for (const { start, end } of merged) {
+    if (start > last) nodes.push(preview.slice(last, start));
+    nodes.push(
+      <mark key={key++} className="search-match">
+        {preview.slice(start, end)}
+      </mark>,
+    );
+    last = end;
+  }
+  if (last < preview.length) nodes.push(preview.slice(last));
+  return nodes;
 }

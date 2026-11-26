@@ -1,4 +1,4 @@
-/** Built-in browser fixture URLs (served from app origin / Tauri asset URL). */
+/** Built-in browser fixture URLs (served from the app origin in dev; file:// asset URL in Electron). */
 
 export type BrowserFixtureId = 'selenium' | 'html-playground';
 

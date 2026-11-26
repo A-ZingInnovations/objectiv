@@ -153,37 +153,6 @@ export function pythonTasksFromArtifacts(artifacts: PythonArtifacts): WorkspaceT
     group: 'run',
   });
 
-  if (artifacts.hasPytest || artifacts.hasUnittestHints) {
-    tasks.push({
-      id: 'python:pytest',
-      label: 'Python: pytest',
-      command: withPython('-m pytest -q'),
-      group: 'test',
-    });
-    tasks.push({
-      id: 'python:pytest:vv',
-      label: 'Python: pytest (verbose)',
-      command: withPython('-m pytest -vv'),
-      group: 'test',
-    });
-  }
-
-  tasks.push({
-    id: 'python:unittest',
-    label: 'Python: unittest discover',
-    command: withPython('-m unittest discover -v'),
-    group: 'test',
-  });
-
-  for (const tf of artifacts.testFiles.slice(0, 8)) {
-    tasks.push({
-      id: `python:pytest:file:${tf}`,
-      label: `Python: pytest ${tf}`,
-      command: withPython(`-m pytest -q ${shQuote(tf)}`),
-      group: 'test',
-    });
-  }
-
   for (const entry of artifacts.entryScripts.slice(0, 4)) {
     tasks.push({
       id: `python:run:${entry}`,

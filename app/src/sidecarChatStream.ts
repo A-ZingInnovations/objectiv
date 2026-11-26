@@ -1,4 +1,5 @@
 import type { PendingEdit } from './types';
+import { formatLlmFetchError } from './llmSuite';
 import { sidecarRequestHeaders } from './objectiveSidecar';
 
 export type SidecarChatDone = {
@@ -35,15 +36,27 @@ export async function postSidecarChatStream(
   handlers: SseHandlers,
 ): Promise<SidecarChatDone> {
   const base = sidecarUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/api/chat`, {
-    method: 'POST',
-    headers: {
-      ...sidecarRequestHeaders(pilotUser),
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ ...body, stream: true }),
-    signal: handlers.signal,
-  });
+  const chatUrl = `${base}/api/chat`;
+  let res: Response;
+  try {
+    res = await fetch(chatUrl, {
+      method: 'POST',
+      headers: {
+        ...sidecarRequestHeaders(pilotUser),
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ ...body, stream: true }),
+      signal: handlers.signal,
+    });
+  } catch (e) {
+    throw new Error(
+      formatLlmFetchError(
+        e,
+        chatUrl,
+        'Objective sidecar (not the Billion context proxy on :8787)',
+      ),
+    );
+  }
 
   if (!res.ok && res.headers.get('content-type')?.includes('json')) {
     const err = (await res.json()) as { error?: string };

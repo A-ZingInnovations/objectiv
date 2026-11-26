@@ -1,4 +1,5 @@
-import { isTauriDesktop } from '../desktopWorkspace';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {nativeInvoke, nativeListen} from '../desktopBridge';
 
 export type SlackSocketEvent = {
   kind: string;
@@ -16,27 +17,24 @@ export type SlackSocketStatus = {
 };
 
 export async function startSlackSocket(appToken: string): Promise<void> {
-  if (!isTauriDesktop()) return;
+  if (!isElectronDesktop()) return;
   const token = appToken.trim();
   if (!token) return;
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('slack_socket_start', { appToken: token });
+  await nativeInvoke('slack_socket_start', { appToken: token });
 }
 
 export async function stopSlackSocket(): Promise<void> {
-  if (!isTauriDesktop()) return;
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('slack_socket_stop');
+  if (!isElectronDesktop()) return;
+  await nativeInvoke('slack_socket_stop');
 }
 
 export async function listenSlackSocket(
   onEvent: (event: SlackSocketEvent) => void,
   onStatus: (status: SlackSocketStatus) => void,
 ): Promise<() => void> {
-  if (!isTauriDesktop()) return () => {};
-  const { listen } = await import('@tauri-apps/api/event');
-  const unEvent = await listen<SlackSocketEvent>('slack-socket-event', (e) => onEvent(e.payload));
-  const unStatus = await listen<SlackSocketStatus>('slack-socket-status', (e) => onStatus(e.payload));
+  if (!isElectronDesktop()) return () => {};
+  const unEvent = await nativeListen<SlackSocketEvent>('slack-socket-event', onEvent);
+  const unStatus = await nativeListen<SlackSocketStatus>('slack-socket-status', onStatus);
   return () => {
     unEvent();
     unStatus();

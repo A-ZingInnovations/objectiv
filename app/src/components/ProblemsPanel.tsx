@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { DiagnosticsByPath, FileDiagnostic } from '../diagnostics';
 import { displayPath } from '../workspaceDisk';
 
@@ -7,6 +8,8 @@ type Props = {
   /** Hide duplicate header when rendered in bottom panel. */
   embedded?: boolean;
 };
+
+type Severity = 'error' | 'warning' | 'info';
 
 function flatten(diagnostics: DiagnosticsByPath): FileDiagnostic[] {
   const rows: FileDiagnostic[] = [];
@@ -21,15 +24,82 @@ function flatten(diagnostics: DiagnosticsByPath): FileDiagnostic[] {
 }
 
 export default function ProblemsPanel({ diagnostics, onOpen, embedded }: Props) {
-  const rows = flatten(diagnostics);
+  const [filter, setFilter] = useState<Severity | 'all'>('all');
+  const rows = useMemo(() => flatten(diagnostics), [diagnostics]);
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return rows;
+    return rows.filter((r) => r.severity === filter);
+  }, [rows, filter]);
+
+  const counts = useMemo(() => {
+    let errors = 0;
+    let warnings = 0;
+    let infos = 0;
+    for (const r of rows) {
+      if (r.severity === 'error') errors += 1;
+      else if (r.severity === 'warning') warnings += 1;
+      else infos += 1;
+    }
+    return { errors, warnings, infos };
+  }, [rows]);
+
+  const sevLabel: Record<Severity | 'all', string> = {
+    all: 'All',
+    error: 'Errors',
+    warning: 'Warnings',
+    info: 'Infos',
+  };
 
   return (
     <>
-      {!embedded && <div className="side-bar-title">PROBLEMS</div>}
+      {!embedded && (
+        <div className="side-bar-title">
+          PROBLEMS
+          <div className="problems-filters">
+            <button
+              type="button"
+              className={`problems-filter ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+              title="All problems"
+            >
+              {sevLabel.all} <span className="problems-filter-count">{counts.errors + counts.warnings + counts.infos}</span>
+            </button>
+            <button
+              type="button"
+              className={`problems-filter ${filter === 'error' ? 'active' : ''}`}
+              onClick={() => setFilter('error')}
+              title="Error problems"
+            >
+              <span className="codicon codicon-error" aria-hidden /> {sevLabel.error} <span className="problems-filter-count">{counts.errors}</span>
+            </button>
+            <button
+              type="button"
+              className={`problems-filter ${filter === 'warning' ? 'active' : ''}`}
+              onClick={() => setFilter('warning')}
+              title="Warning problems"
+            >
+              <span className="codicon codicon-warning" aria-hidden /> {sevLabel.warning} <span className="problems-filter-count">{counts.warnings}</span>
+            </button>
+            <button
+              type="button"
+              className={`problems-filter ${filter === 'info' ? 'active' : ''}`}
+              onClick={() => setFilter('info')}
+              title="Info problems"
+            >
+              <span className="codicon codicon-info" aria-hidden /> {sevLabel.info} <span className="problems-filter-count">{counts.infos}</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div className={`problems-panel ${embedded ? 'embedded' : ''}`}>
-        {rows.length === 0 && <p className="side-bar-placeholder-hint">No problems detected.</p>}
+        {filtered.length === 0 && (
+          <p className="side-bar-placeholder-hint">
+            {filter === 'all' ? 'No problems detected.' : `No ${sevLabel[filter].toLowerCase()} detected.`}
+          </p>
+        )}
         <ul className="problems-list">
-          {rows.map((d, i) => (
+          {filtered.map((d, i) => (
             <li key={`${d.path}:${d.line}:${i}`}>
               <button
                 type="button"

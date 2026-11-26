@@ -1,8 +1,8 @@
 import type { MeetingSession } from '../meetingTab';
 import IntegrationBrandIcon from './IntegrationBrandIcon';
 import type { IntegrationBrand } from '../integrations/integrationActivity';
-import { useObjectivBrowserWebview } from '../useObjectivBrowserWebview';
-import { isTauriDesktop } from '../desktopWorkspace';
+import {useObjectivBrowserWebview} from '../useObjectivBrowserWebview';
+import {isElectronDesktop} from '../desktopWorkspace';
 
 const BRAND: Record<MeetingSession['platform'], IntegrationBrand> = {
   zoom: 'zoom',
@@ -21,7 +21,7 @@ export default function MeetingTabView({ session, onReload }: Props) {
     sessionId: session.tabId,
     url: session.url,
     reloadToken: session.reloadToken,
-    active: isTauriDesktop(),
+    active: isElectronDesktop(),
   });
 
   const brand = BRAND[session.platform];
@@ -41,7 +41,7 @@ export default function MeetingTabView({ session, onReload }: Props) {
         </div>
       </header>
       <div className="meeting-tab-stage" ref={hostRef}>
-        {!isTauriDesktop() ? (
+        {!isElectronDesktop() ? (
           <p className="messaging-transcript-empty">Meetings require the Objectiv desktop app.</p>
         ) : null}
       </div>

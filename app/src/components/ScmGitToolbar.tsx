@@ -3,13 +3,23 @@ import { useEffect, useRef, useState } from 'react';
 export type ScmGitAction =
   | 'fetch'
   | 'pull'
+  | 'pullFfOnly'
   | 'pullRebase'
   | 'push'
   | 'pushUpstream'
   | 'createBranch'
   | 'rebase'
   | 'rebaseOnto'
-  | 'stageAll';
+  | 'rebaseContinue'
+  | 'rebaseAbort'
+  | 'rebaseSkip'
+  | 'mergeContinue'
+  | 'mergeAbort'
+  | 'stageAll'
+  | 'discardAll'
+  | 'resetSoft'
+  | 'resetMixed'
+  | 'resetHard';
 
 type Props = {
   disabled: boolean;
@@ -91,7 +101,10 @@ export default function ScmGitToolbar({ disabled, hasRepo, onAction }: Props) {
         {menuOpen && (
           <div className="scm-toolbar-menu" role="menu">
             <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('pullRebase'); }}>
-              Pull (Rebase)
+              Pull (rebase)
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('pullFfOnly'); }}>
+              Pull (fast-forward only)
             </button>
             <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('rebase'); }}>
               Rebase onto upstream
@@ -99,12 +112,39 @@ export default function ScmGitToolbar({ disabled, hasRepo, onAction }: Props) {
             <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('rebaseOnto'); }}>
               Rebase onto branch…
             </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('rebaseContinue'); }}>
+              Rebase — continue
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('rebaseAbort'); }}>
+              Rebase — abort
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('rebaseSkip'); }}>
+              Rebase — skip
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('mergeContinue'); }}>
+              Merge — continue
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('mergeAbort'); }}>
+              Merge — abort
+            </button>
             <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('pushUpstream'); }}>
               Push — set upstream
             </button>
             <hr />
             <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('stageAll'); }}>
               Stage all changes
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('discardAll'); }}>
+              Discard all local changes
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('resetSoft'); }}>
+              Reset (soft) — keep changes staged
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('resetMixed'); }}>
+              Reset (mixed) — unstage, keep files
+            </button>
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onAction('resetHard'); }}>
+              Reset (hard) — discard all uncommitted
             </button>
           </div>
         )}

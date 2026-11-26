@@ -1,5 +1,5 @@
 const KEY = 'objectiv-recent-files-v1';
-const LEGACY_KEY = 'aziai-recent-files-v1';
+const LEGACY_KEY = 'objectiv-legacy-recent-files-v1';
 const MAX = 30;
 
 export function loadRecentFiles(): string[] {

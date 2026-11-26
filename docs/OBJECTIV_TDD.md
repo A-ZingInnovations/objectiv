@@ -18,7 +18,7 @@ This TDD specifies **how** Objectiv and Objective are built: architecture, compo
 
 ```
 ┌─ Objectiv app (Vite + React + Monaco) ─────────────────────┐
-│  Tauri 2 desktop (optional) · web fallback                 │
+│  Electron desktop · web dev fallback                       │
 │  Settings · NotificationHost · AgentChat · NotebookViewer  │
 │  Appearance (zoom / chrome) · workspace FS watch           │
 └───────────────────────┬────────────────────────────────────┘
@@ -42,7 +42,7 @@ Eval path: SWE Docker (regression only)
 | Path / repo | Stack | Responsibility |
 |-------------|-------|----------------|
 | `objectiv/app` | React, Monaco, Vite | Objectiv UI |
-| `objectiv/desktop` | Tauri 2 (Rust) | Native window, PTY, menus, folder pickers, notebook kernel, FS watch |
+| `objectiv/electron` | Electron (Node) | Native window, PTY, menus, folder pickers, notebook kernel, FS watch, embedded browser (BrowserView) |
 | `objectiv/backend` | FastAPI + Ollama | Optional local chat backend (not primary agent) |
 | `azing-codex` / `objective` | TS | Sidecar agent loop, tools, VS Code extension |
 | `coding-agent` | Python | Serve, SFT/RL, G1 scripts, Monday, docs/PDF |
@@ -95,7 +95,7 @@ Headers: `X-Objective-Pilot-User`, `X-Objective-Surface` (e.g. `objectiv`).
 
 ### 5.1 Settings schema (selected)
 
-Stored as `objectiv-settings-v1` in `localStorage` (legacy key `aziai-settings-v1`).
+Stored as `objectiv-settings-v1` in `localStorage` (legacy key `objectiv-legacy-settings-v1`).
 
 - Connection: `sidecarUrl`, `pilotUser`  
 - Integrations: `chatPlatform`, `chatCredential`, `meetingPlatform`, `meetingCredential`, IMAP/POP fields  
@@ -111,7 +111,7 @@ Zoom: `app/src/zoom.ts` — VS Code–style `1.2^zoomLevel` applied to `document
 `app/src/branding.ts`: `PRODUCT_NAME=Objectiv`, `PRODUCT_CODE=AZO`, `PRODUCT_TAGLINE=A-Zing's Objectiv`.
 
 Logo: `docs/branding/objectiv-azo-logo.jpg` · `app/public/objectiv-azo-logo.jpg`.  
-Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg` into `desktop/src-tauri/icons/` (`icon.icns`, `icon.ico`, PNGs). Configured in `tauri.conf.json` → `bundle.icon`.
+Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg`; configured for the Electron bundle (`.icns`, `.ico`, PNG) via `electron-builder`.
 
 ### 5.3 Notifications
 
@@ -120,9 +120,9 @@ Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg` into `deskt
 - Outbox stub keys: `objectiv-outbox-*`  
 - Live push from connectors: future WebSocket/SSE from sidecar or local poller  
 
-### 5.4 Desktop (Tauri)
+### 5.4 Desktop (Electron)
 
-- Menu events: `objectiv-menu` (legacy `aziai-menu` migrated)  
+- Menu events: `objectiv-menu` (legacy `objectiv-legacy-menu` migrated)  
 - View → Appearance menu IDs: `view_fullscreen`, `view_toggle_sidebar`, `view_toggle_panel`, `view_toggle_activity_bar`, `view_toggle_status_bar`, `view_toggle_menu_bar`, `view_toggle_centered`, `view_theme_dark` / `view_theme_light`, `view_zoom_*`  
 - Folder/file pickers, PTY, terminal pop-out `WebviewWindow`  
 - Workspace mkdir / rename / delete / reveal; FS watch pool (`notify` + poll) → `WORKSPACE_CHANGED` to UI  
@@ -135,7 +135,7 @@ Dock/app icons: generated from `docs/branding/objectiv-azo-icon.jpg` into `deskt
 |-------|-------------------|
 | Viewer | `app/src/components/NotebookViewer.tsx` + `app/src/notebook/*` (nbformat parse/serialize, ANSI) |
 | Kind | `fileViewers` → notebook for `.ipynb` |
-| Kernel | Tauri `notebook_kernel` pool: persistent Python, JSON-lines protocol, helper under `desktop/src-tauri/scripts/` |
+| Kernel | Electron `notebook_kernel` pool: persistent Python, JSON-lines protocol, helper under `scripts/objectiv_notebook_kernel.py` |
 | Queue | Shared busy lock — cells queue; UI shows queued vs running |
 | Save | Outputs written back into `.ipynb` on disk |
 
@@ -252,7 +252,7 @@ Register adapters from env/settings; Objectiv never hard-codes a single vendor w
 1. Sidecar vs Python ownership of long-running stream sessions.  
 2. First production chat adapter (Teams vs Slack).  
 3. IMAP send path (SMTP submit vs provider API).  
-4. Whether notification ingress lives in Tauri vs sidecar poller.  
+4. Whether notification ingress lives in the Electron main process vs sidecar poller.  
 5. How far custom shell goes vs defaulting heavy editing to OpenVSCode embed.
 
 ## 15. Traceability
@@ -262,7 +262,7 @@ Register adapters from env/settings; Objectiv never hard-codes a single vendor w
 | F-A* | §4 Codex agent |
 | F-M* | §4.2 tools, §8 env, §11 adapters |
 | F-N* | §5.3 notifications |
-| F-W1–F-W6, F-W8–F-W12 | §5 Objectiv app / Tauri / Appearance / branding |
+| F-W1–F-W6, F-W8–F-W12 | §5 Objectiv app / Electron / Appearance / branding |
 | F-W7 | §5.5 Notebooks |
 | F-H* | §6 coding-agent |
 

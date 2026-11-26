@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { isTauriDesktop, runShellInWorkspace } from '../desktopWorkspace';
+import {useState} from 'react';
+import {isElectronDesktop, runShellInWorkspace} from '../desktopWorkspace';
 
 type Props = {
   workspaceRoot: string | null;
@@ -13,7 +13,7 @@ export default function TerminalPanel({ workspaceRoot }: Props) {
   async function run() {
     const cmd = input.trim();
     if (!cmd || busy) return;
-    if (!isTauriDesktop() || !workspaceRoot) {
+    if (!isElectronDesktop() || !workspaceRoot) {
       setHistory((h) => [...h, '$ ' + cmd, '(terminal requires desktop + open folder)\n']);
       setInput('');
       return;

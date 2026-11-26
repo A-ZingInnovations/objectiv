@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isTauriDesktop, searchWorkspace } from '../desktopWorkspace';
-import { parseSearchHitLine, type ParsedSearchHit } from '../searchParse';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { readWorkspaceFile, searchWorkspace } from '../desktopWorkspace';
+import { parseSearchHitLine, parseSearchTerms, type ParsedSearchHit } from '../searchParse';
 import { loadSearchPrefs, saveSearchPrefs, type SearchPrefs } from '../searchPrefs';
 import {
   groupSearchHits,
   highlightSearchPreview,
   formatSearchPreview,
 } from '../searchResultsUi';
+import { replaceAllInWorkspaceFiles, replaceInText } from '../workspaceSearchReplace';
+import { useIsElectronDesktop } from '../useIsElectronDesktop';
 import FileTypeIcon from './FileTypeIcon';
-import SideBarSection from './SideBarSection';
+import SideBarOpenFolderHint from './SideBarOpenFolderHint';
 
 type Props = {
   workspaceRoot: string | null;
@@ -16,6 +25,8 @@ type Props = {
   scopeFolder?: string | null;
   onQuickOpen?: () => void;
   onOpenMatch: (rel: string, line?: number) => void;
+  onOpenFolder?: () => void;
+  onRefreshExplorer?: () => void;
 };
 
 function Toggle({
@@ -45,31 +56,26 @@ function Toggle({
   );
 }
 
-function fuzzyMatchFile(query: string, path: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const p = path.toLowerCase();
-  if (p.includes(q)) return true;
-  let i = 0;
-  for (const ch of p) {
-    if (ch === q[i]) i += 1;
-    if (i >= q.length) return true;
-  }
-  return false;
-}
+const SHOW_REPLACE_KEY = 'objectiv-search-show-replace';
 
 export default function SearchPanel({
   workspaceRoot,
-  workspaceFileRels = [],
   scopeFolder,
   onQuickOpen,
   onOpenMatch,
+  onOpenFolder,
+  onRefreshExplorer,
 }: Props) {
+  const desktop = useIsElectronDesktop();
   const [query, setQuery] = useState('');
-  const [fileQuery, setFileQuery] = useState('');
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [fileSearchOpen, setFileSearchOpen] = useState(false);
-  const [textSearchOpen, setTextSearchOpen] = useState(false);
+  const [replaceQueries, setReplaceQueries] = useState<string[]>(['']);
+  const [showReplace, setShowReplace] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_REPLACE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [prefs, setPrefs] = useState<SearchPrefs>(() => loadSearchPrefs());
   const [showFilters, setShowFilters] = useState(
     () =>
@@ -78,25 +84,34 @@ export default function SearchPanel({
   );
   const [results, setResults] = useState<ParsedSearchHit[]>([]);
   const [busy, setBusy] = useState(false);
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replacePreview, setReplacePreview] = useState<{ rel: string; before: string; after: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(() => new Set());
   const [activeHitKey, setActiveHitKey] = useState<string | null>(null);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
-  /** Ignore stale `workspace_search` responses when the user types ahead. */
   const searchGenerationRef = useRef(0);
 
+  const disabled = !workspaceRoot || !desktop;
+
   const groups = useMemo(() => groupSearchHits(results), [results]);
+
+  const searchTerms = useMemo(
+    () => parseSearchTerms(query, prefs.useRegex),
+    [query, prefs.useRegex],
+  );
 
   const highlightOpts = useMemo(
     () => ({
       query: query.trim(),
+      terms: searchTerms.length > 1 ? searchTerms : undefined,
       matchCase: prefs.matchCase,
       useRegex: prefs.useRegex,
       wholeWord: prefs.wholeWord,
     }),
-    [query, prefs.matchCase, prefs.useRegex, prefs.wholeWord],
+    [query, searchTerms, prefs.matchCase, prefs.useRegex, prefs.wholeWord],
   );
 
   useEffect(() => {
@@ -110,6 +125,14 @@ export default function SearchPanel({
     }
   }, [scopeFolder]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHOW_REPLACE_KEY, showReplace ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [showReplace]);
+
   const patchPrefs = useCallback((patch: Partial<SearchPrefs>) => {
     setPrefs((p) => {
       const next = { ...p, ...patch };
@@ -121,7 +144,7 @@ export default function SearchPanel({
   const runSearch = useCallback(async () => {
     const q = query.trim();
     if (!q || !workspaceRoot) return;
-    if (!isTauriDesktop()) {
+    if (!desktop) {
       setError('Search requires the Objectiv desktop app.');
       return;
     }
@@ -131,8 +154,10 @@ export default function SearchPanel({
     setError(null);
     setSearched(true);
     try {
+      const terms = parseSearchTerms(q, p.useRegex);
       const lines = await searchWorkspace(workspaceRoot, {
-        pattern: q,
+        pattern: terms[0] ?? q,
+        patterns: terms.length > 1 ? terms : undefined,
         include: p.include.trim() || undefined,
         exclude: p.exclude.trim() || undefined,
         folder: p.folder.trim() || undefined,
@@ -142,9 +167,17 @@ export default function SearchPanel({
       });
       if (generation !== searchGenerationRef.current) return;
 
-      const parsed = lines
-        .map((line) => parseSearchHitLine(line, workspaceRoot))
-        .filter((h): h is ParsedSearchHit => h !== null);
+      const seen = new Set<string>();
+      const parsed: ParsedSearchHit[] = [];
+      for (const line of lines) {
+        const hit = parseSearchHitLine(line, workspaceRoot);
+        if (!hit) continue;
+        const dedupeKey = `${hit.rel}:${hit.line}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        parsed.push(hit);
+      }
+      parsed.sort((a, b) => a.rel.localeCompare(b.rel) || a.line - b.line);
       setResults(parsed);
       setCollapsedFiles(new Set(parsed.map((h) => h.rel)));
       setActiveHitKey(null);
@@ -160,7 +193,45 @@ export default function SearchPanel({
         setBusy(false);
       }
     }
-  }, [query, workspaceRoot]);
+  }, [query, workspaceRoot, desktop]);
+
+  const onSearchInputKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (e.key === 'Escape') {
+        if (query) {
+          e.preventDefault();
+          setQuery('');
+          setResults([]);
+          setSearched(false);
+          setError(null);
+        }
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        void runSearch();
+        return;
+      }
+      if (mod && e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === 'c') {
+          e.preventDefault();
+          patchPrefs({ matchCase: !prefsRef.current.matchCase });
+        } else if (k === 'w') {
+          e.preventDefault();
+          patchPrefs({ wholeWord: !prefsRef.current.wholeWord });
+        } else if (k === 'r') {
+          e.preventDefault();
+          patchPrefs({ useRegex: !prefsRef.current.useRegex });
+        } else if (k === 'f') {
+          e.preventDefault();
+          setShowReplace((v) => !v);
+        }
+      }
+    },
+    [query, runSearch, patchPrefs],
+  );
 
   useEffect(() => {
     if (!query.trim() || !workspaceRoot) return;
@@ -197,73 +268,79 @@ export default function SearchPanel({
     setCollapsedFiles(new Set());
   }, []);
 
-  const allCollapsed =
-    groups.length > 0 && groups.every((g) => collapsedFiles.has(g.rel));
+  const allCollapsed = groups.length > 0 && groups.every((g) => collapsedFiles.has(g.rel));
   const allExpanded = collapsedFiles.size === 0;
 
-  const fileHits = useMemo(() => {
-    const list = workspaceFileRels.filter((rel) => fuzzyMatchFile(fileQuery, rel));
-    return list.slice(0, 40);
-  }, [workspaceFileRels, fileQuery]);
+  const generateReplacePreview = useCallback(async () => {
+    if (!workspaceRoot || !query.trim() || results.length === 0) return;
+    setReplaceBusy(true);
+    setError(null);
+    try {
+      const preview: { rel: string; before: string; after: string }[] = [];
+      for (const hit of results) {
+        const before = await readWorkspaceFile(workspaceRoot, hit.rel);
+        const after = replaceInText(before, {
+          query,
+          replacements: replaceQueries.map((q) => q),
+          replacement: replaceQueries[0] ?? '',
+          matchCase: prefs.matchCase,
+          wholeWord: prefs.wholeWord,
+          useRegex: prefs.useRegex,
+        });
+        if (after !== before) {
+          preview.push({ rel: hit.rel, before, after });
+        }
+      }
+      setReplacePreview(preview);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReplaceBusy(false);
+    }
+  }, [workspaceRoot, query, replaceQueries, results, prefs]);
+
+  const replaceAll = useCallback(async () => {
+    if (!workspaceRoot || !query.trim() || results.length === 0) return;
+    setReplaceBusy(true);
+    setError(null);
+    try {
+      const { filesChanged } = await replaceAllInWorkspaceFiles(
+        workspaceRoot,
+        results.map((r) => r.rel),
+        {
+          query,
+          replacements: replaceQueries.map((q) => q),
+          replacement: replaceQueries[0] ?? '',
+          matchCase: prefs.matchCase,
+          wholeWord: prefs.wholeWord,
+          useRegex: prefs.useRegex,
+        },
+      );
+      onRefreshExplorer?.();
+      setReplacePreview(null);
+      await runSearch();
+      if (filesChanged === 0) {
+        setError('No matches were replaced in the result set.');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReplaceBusy(false);
+    }
+  }, [
+    workspaceRoot,
+    query,
+    replaceQueries,
+    results,
+    prefs,
+    onRefreshExplorer,
+    runSearch,
+  ]);
 
   return (
     <>
       <div className="side-bar-title">SEARCH</div>
-      <div className="search-panel side-bar-scroll">
-        <SideBarSection
-          title="Quick Open"
-          open={quickOpen}
-          onToggle={() => setQuickOpen((v) => !v)}
-        >
-          <button
-            type="button"
-            className="run-list-btn search-quick-open-btn"
-            disabled={!onQuickOpen}
-            onClick={() => onQuickOpen?.()}
-          >
-            <span className="codicon codicon-search" aria-hidden />
-            Go to file… (⌘P)
-          </button>
-        </SideBarSection>
-
-        <SideBarSection
-          title="File Search"
-          count={fileHits.length}
-          open={fileSearchOpen}
-          onToggle={() => setFileSearchOpen((v) => !v)}
-        >
-          <input
-            className="search-query-input search-file-filter"
-            value={fileQuery}
-            onChange={(e) => setFileQuery(e.target.value)}
-            placeholder="Filter by name"
-            disabled={!workspaceRoot}
-          />
-          {fileHits.length === 0 ? (
-            <p className="sidebar-section-empty">No matching files</p>
-          ) : (
-            <ul className="sidebar-section-list">
-              {fileHits.map((rel) => (
-                <li key={rel}>
-                  <button
-                    type="button"
-                    className="sidebar-section-item"
-                    onClick={() => onOpenMatch(rel)}
-                  >
-                    <FileTypeIcon path={rel} className="sidebar-section-item-icon" size="sm" />
-                    <span className="sidebar-section-item-label">{rel}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SideBarSection>
-
-        <SideBarSection
-          title="Text Search"
-          open={textSearchOpen}
-          onToggle={() => setTextSearchOpen((v) => !v)}
-        >
+      <div className="search-panel">
         <form
           className="search-form"
           onSubmit={(e) => {
@@ -271,54 +348,110 @@ export default function SearchPanel({
             void runSearch();
           }}
         >
-          <div className="search-query-row">
-            <input
-              className="search-query-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search"
-              disabled={!workspaceRoot}
-            />
-            <button
-              type="submit"
-              className="search-run-btn"
-              disabled={!query.trim() || !workspaceRoot}
-              title="Search"
-            >
-              <span className="codicon codicon-search" aria-hidden />
-            </button>
+          <div className="search-editor-widget">
+            <div className="search-widget-row">
+              <span className="codicon codicon-search search-widget-glyph" aria-hidden />
+              <input
+                className="search-query-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onSearchInputKeyDown}
+                placeholder="Search"
+                title="Search (Enter to search, ⌥⌘C case, ⌥⌘W word, ⌥⌘R regex)"
+                disabled={disabled}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="search-widget-icon-btn"
+                title={showReplace ? 'Hide replace field' : 'Show replace field'}
+                aria-expanded={showReplace}
+                disabled={disabled}
+                onClick={() => setShowReplace((v) => !v)}
+              >
+                <span
+                  className={`codicon ${showReplace ? 'codicon-chevron-down' : 'codicon-chevron-right'}`}
+                  aria-hidden
+                />
+              </button>
+            </div>
+            {showReplace && (
+              <>
+                <div className="search-widget-row search-widget-row-replace">
+                  <span className="codicon codicon-replace search-widget-glyph" aria-hidden />
+                  <span className="search-replace-label">Replace {searchTerms.length > 1 ? '(by index)' : ''}</span>
+                </div>
+                {searchTerms.map((term, i) => (
+                  <div key={i} className="search-widget-row search-widget-row-replace">
+                    <span className="codicon codicon-replace search-widget-glyph" aria-hidden />
+                    <input
+                      className="search-query-input"
+                      value={replaceQueries[i] ?? ''}
+                      onChange={(e) =>
+                        setReplaceQueries((prev) => {
+                          const next = [...prev];
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      placeholder={`Replace “${term}” with…`}
+                      title={`Replace ${term}`}
+                      disabled={disabled}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="search-widget-icon-btn"
+                  title="Add replace field"
+                  disabled={disabled || searchTerms.length <= 1}
+                  onClick={() =>
+                    setReplaceQueries((prev) => [...prev, ''])
+                  }
+                >
+                  <span className="codicon codicon-add" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className="search-widget-icon-btn"
+                  title="Preview Replace"
+                  disabled={disabled || !results.length || replaceBusy}
+                  onClick={() => void generateReplacePreview()}
+                >
+                  <span className="codicon codicon-eye" aria-hidden />
+                </button>
+              </>
+            )}
           </div>
 
           <div className="search-toggle-row">
             <Toggle
               active={prefs.matchCase}
-              title="Match case"
+              title="Match Case"
               label="Aa"
-              disabled={!workspaceRoot}
-              onClick={() => {
-                patchPrefs({ matchCase: !prefs.matchCase });
-              }}
+              disabled={disabled}
+              onClick={() => patchPrefs({ matchCase: !prefs.matchCase })}
             />
             <Toggle
               active={prefs.wholeWord}
-              title="Match whole word"
+              title="Match Whole Word"
               label="ab"
-              disabled={!workspaceRoot}
+              disabled={disabled}
               onClick={() => patchPrefs({ wholeWord: !prefs.wholeWord })}
             />
             <Toggle
               active={prefs.useRegex}
-              title="Use regular expression"
+              title="Use Regular Expression"
               label=".*"
-              disabled={!workspaceRoot}
+              disabled={disabled}
               onClick={() => patchPrefs({ useRegex: !prefs.useRegex })}
             />
             <button
               type="button"
               className={`search-toggle search-filter-toggle ${showFilters ? 'active' : ''}`}
-              title="Toggle search filters"
+              title="Toggle search details"
               aria-expanded={showFilters}
-              disabled={!workspaceRoot}
+              disabled={disabled}
               onClick={() => setShowFilters((v) => !v)}
             >
               <span className="codicon codicon-filter" aria-hidden />
@@ -332,8 +465,8 @@ export default function SearchPanel({
                 <input
                   value={prefs.include}
                   onChange={(e) => patchPrefs({ include: e.target.value })}
-                  placeholder="e.g. *.ts, *.tsx"
-                  disabled={!workspaceRoot}
+                  placeholder="e.g. *.ts, src/**"
+                  disabled={disabled}
                 />
               </label>
               <label className="search-field">
@@ -341,8 +474,8 @@ export default function SearchPanel({
                 <input
                   value={prefs.exclude}
                   onChange={(e) => patchPrefs({ exclude: e.target.value })}
-                  placeholder="e.g. node_modules, dist, *.min.js"
-                  disabled={!workspaceRoot}
+                  placeholder="e.g. node_modules, dist"
+                  disabled={disabled}
                 />
               </label>
               <label className="search-field">
@@ -350,17 +483,79 @@ export default function SearchPanel({
                 <input
                   value={prefs.folder}
                   onChange={(e) => patchPrefs({ folder: e.target.value })}
-                  placeholder="Relative path, e.g. src/components"
-                  disabled={!workspaceRoot}
+                  placeholder="Relative path, e.g. src"
+                  disabled={disabled}
                 />
               </label>
             </div>
           )}
+
+          {showReplace && workspaceRoot && (
+            <div className="search-replace-actions">
+              <button
+                type="button"
+                className="search-replace-btn"
+                disabled={disabled || !results.length || replaceBusy || busy}
+                title="Replace all matches in files with search results"
+                onClick={() => void replaceAll()}
+              >
+                {replaceBusy ? 'Replacing…' : 'Replace All'}
+              </button>
+              {replacePreview && replacePreview.length > 0 && (
+                <div className="search-replace-preview">
+                  <div className="search-replace-preview-header">
+                    <span>Preview ({replacePreview.length} file{replacePreview.length === 1 ? '' : 's'} changed)</span>
+                    <button
+                      type="button"
+                      className="search-replace-preview-close"
+                      title="Close preview"
+                      onClick={() => setReplacePreview(null)}
+                    >
+                      <span className="codicon codicon-close" aria-hidden />
+                    </button>
+                  </div>
+                  <ul className="search-replace-preview-list">
+                    {replacePreview.map((p) => (
+                      <li key={p.rel} className="search-replace-preview-item">
+                        <div className="search-replace-preview-file">{p.rel}</div>
+                        <div className="search-replace-preview-diff">
+                          <div className="search-replace-preview-side">
+                            <span className="search-replace-preview-label">Before</span>
+                            <pre className="search-replace-preview-before">{p.before}</pre>
+                          </div>
+                          <div className="search-replace-preview-side">
+                            <span className="search-replace-preview-label">After</span>
+                            <pre className="search-replace-preview-after">{p.after}</pre>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="search-go-to-file"
+            disabled={!onQuickOpen}
+            title={onQuickOpen ? 'Quick Open' : undefined}
+            onClick={() => onQuickOpen?.()}
+          >
+            Go to File…
+            <span className="search-go-to-file-keys">⌘P</span>
+          </button>
         </form>
 
         <div className="search-results-pane">
-          {!workspaceRoot && <p className="side-bar-placeholder-hint">Open folder…</p>}
-          {!isTauriDesktop() && workspaceRoot && (
+          {!workspaceRoot &&
+            (onOpenFolder ? (
+              <SideBarOpenFolderHint onOpenFolder={onOpenFolder} />
+            ) : (
+              <p className="side-bar-placeholder-hint">Open a folder to search.</p>
+            ))}
+          {!desktop && workspaceRoot && (
             <p className="side-bar-placeholder-hint">Search requires the Objectiv desktop app.</p>
           )}
           {error && (
@@ -369,7 +564,7 @@ export default function SearchPanel({
               <p>{error}</p>
             </div>
           )}
-          {busy && results.length === 0 && (
+          {busy && results.length === 0 && workspaceRoot && (
             <div className="search-busy" aria-live="polite">
               <div className="search-busy-bar" />
               <p className="search-empty-state">
@@ -378,12 +573,22 @@ export default function SearchPanel({
               </p>
             </div>
           )}
-          {searched && !busy && !error && results.length === 0 && query.trim() && workspaceRoot && (
-            <div className="search-empty-state">
-              <span className="codicon codicon-search" aria-hidden />
-              <p>No results for “{query.trim()}”</p>
-            </div>
-          )}
+          {searched &&
+            !busy &&
+            !error &&
+            results.length === 0 &&
+            query.trim() &&
+            workspaceRoot && (
+              <div className="search-empty-state">
+                <span className="codicon codicon-search" aria-hidden />
+                <p>
+                  No results for{' '}
+                  {searchTerms.length > 1
+                    ? searchTerms.map((t) => `“${t}”`).join(', ')
+                    : `“${query.trim()}”`}
+                </p>
+              </div>
+            )}
 
           {results.length > 0 && (
             <>
@@ -507,7 +712,6 @@ export default function SearchPanel({
             </>
           )}
         </div>
-        </SideBarSection>
       </div>
     </>
   );

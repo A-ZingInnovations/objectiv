@@ -1,5 +1,6 @@
 import DocumentPane, { type DocumentPaneProps } from './DocumentPane';
 import { displayPath } from '../workspaceDisk';
+import type { SplitAxis, SplitPlacement } from '../editorSplit';
 
 export type EditorPaneId = 'primary' | 'secondary';
 
@@ -7,6 +8,9 @@ export type EditorPaneProps = DocumentPaneProps;
 
 type Props = {
   split: boolean;
+  /** Optional — WorkbenchShell passes these; classic App ignores layout axis. */
+  splitAxis?: SplitAxis;
+  splitPlacement?: SplitPlacement;
   focus: EditorPaneId;
   primary: EditorPaneProps;
   secondary: EditorPaneProps | null;

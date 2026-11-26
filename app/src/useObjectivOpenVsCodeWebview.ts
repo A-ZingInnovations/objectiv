@@ -1,13 +1,12 @@
-import { useLayoutEffect, useRef } from 'react';
-import { TauriEvent } from '@tauri-apps/api/event';
-import { hideOpenVsCodeWebview, syncOpenVsCodeWebview } from './openVsCodeWebview';
-import { isTauriDesktop } from './desktopWorkspace';
+import {useLayoutEffect, useRef} from 'react';
+import {hideOpenVsCodeWebview, syncOpenVsCodeWebview} from './openVsCodeWebview';
+import {isElectronDesktop} from './desktopWorkspace';
 
 export function useObjectivOpenVsCodeWebview(url: string, active: boolean) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (!isTauriDesktop()) return;
+    if (!isElectronDesktop()) return;
 
     let cancelled = false;
     const unsubs: Array<() => void> = [];
@@ -41,16 +40,11 @@ export function useObjectivOpenVsCodeWebview(url: string, active: boolean) {
 
     void (async () => {
       try {
-        const { listen } = await import('@tauri-apps/api/event');
-        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-        const main = getCurrentWebviewWindow();
+        const { nativeListen } = await import('./desktopBridge');
         if (cancelled) return;
-        unsubs.push(await listen(TauriEvent.WINDOW_RESIZED, run));
-        unsubs.push(await listen(TauriEvent.WINDOW_MOVED, run));
-        unsubs.push(await main.listen(TauriEvent.WINDOW_RESIZED, run));
-        unsubs.push(await main.listen(TauriEvent.WINDOW_MOVED, run));
+        unsubs.push(await nativeListen<unknown>('window-resized', () => run()));
       } catch (e) {
-        console.warn('[openvscode] listeners', e);
+        console.warn('[openvscode] window resize listener', e);
       }
     })();
 

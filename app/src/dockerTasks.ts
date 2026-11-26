@@ -52,7 +52,7 @@ function shQuote(s: string): string {
 
 function imageTagFromRoot(workspaceRoot: string, dockerfileRel?: string): string {
   const folder = workspaceRoot.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? 'objectiv';
-  let tag = folder.replace(/[^a-zA-Z0-9_.-]+/g, '-').toLowerCase() || 'objectiv';
+  let tag = folder.replace(/[^a-zA-Z0-9.-]+/g, '-').toLowerCase() || 'objectiv';
   if (dockerfileRel && dockerfileRel !== 'Dockerfile') {
     const suffix = baseName(dockerfileRel)
       .replace(/^dockerfile\.?/i, '')

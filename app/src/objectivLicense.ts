@@ -173,3 +173,10 @@ export function resolveEffectiveEdition(settings: { enterpriseLicenseKey: string
 export function isEnterpriseLicensed(settings: { enterpriseLicenseKey: string }): boolean {
   return resolveEffectiveEdition(settings) === 'enterprise';
 }
+
+export function isBiliContextActive(settings: {
+  enterpriseLicenseKey: string;
+  biliContextEnabled: boolean;
+}): boolean {
+  return settings.biliContextEnabled && isEnterpriseLicensed(settings);
+}

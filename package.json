@@ -5,10 +5,10 @@
   "scripts": {
     "dev": "npm run dev --prefix app",
     "dev:backend": "python backend/main.py",
-    "dev:desktop": "npm run dev --prefix desktop",
+    "dev:desktop": "npm run dev --prefix electron",
     "reload": "bash scripts/objectiv-reload.sh",
     "build": "npm run build --prefix app",
-    "build:desktop": "npm run build --prefix app && npm run build --prefix desktop",
+    "build:desktop": "npm run build --prefix app && npm run build --prefix electron",
     "marketplace:lint": "node scripts/objv-cli.mjs catalog lint",
     "marketplace:validate": "node scripts/objv-cli.mjs validate",
     "marketplace:package": "node scripts/objv-cli.mjs package"

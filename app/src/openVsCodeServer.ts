@@ -1,5 +1,6 @@
-import type { ObjectivSettings } from './aziaiSettings';
-import { isTauriDesktop } from './desktopWorkspace';
+import type { ObjectivSettings } from './objectivSettings';
+import {isElectronDesktop} from './desktopWorkspace';
+import {nativeInvoke} from './desktopBridge';
 
 function envOpenVsCodeToken(): string {
   return import.meta.env.VITE_OBJECTIV_OPENVSCODE_TOKEN || '';
@@ -43,21 +44,22 @@ export async function startOpenVsCodeServer(
   if (isHostedOpenVsCode(settings)) {
     return buildHostedOpenVsCodeUrl(settings);
   }
-  if (!isTauriDesktop()) {
+  if (!isElectronDesktop()) {
     throw new Error('Local OpenVSCode Server requires the Objectiv desktop app.');
   }
   if (!workspaceRoot) {
     throw new Error('Open a workspace folder for local OpenVSCode Server.');
   }
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<string>('openvscode_start', { root: workspaceRoot, port: settings.openVsCodePort });
+  return nativeInvoke<string>('openvscode_start', {
+    root: workspaceRoot,
+    port: settings.openVsCodePort,
+  });
 }
 
 export async function stopOpenVsCodeServer(settings: OpenVsCodeConnectSettings): Promise<void> {
   if (isHostedOpenVsCode(settings)) return;
-  if (!isTauriDesktop()) return;
-  const { invoke } = await import('@tauri-apps/api/core');
-  await invoke('openvscode_stop');
+  if (!isElectronDesktop()) return;
+  await nativeInvoke('openvscode_stop');
 }
 
 export async function openVsCodeStatus(
@@ -66,9 +68,8 @@ export async function openVsCodeStatus(
   if (isHostedOpenVsCode(settings)) {
     return { running: false, url: null };
   }
-  if (!isTauriDesktop()) {
+  if (!isElectronDesktop()) {
     return { running: false, url: null };
   }
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<OpenVsCodeStatus>('openvscode_status');
+  return nativeInvoke<OpenVsCodeStatus>('openvscode_status');
 }

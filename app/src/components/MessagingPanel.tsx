@@ -1,40 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import SideBarSection from './SideBarSection';
-import { useObjectivSettings } from '../settingsContext';
-import { LUCID_SLACK, messagingPlatformLabel } from '../integrations/lucidSlack';
-import {
-  authorHue,
-  authorInitials,
-  formatMessageTime,
-  type ChatMessage,
-} from '../integrations/messagingHistory';
-import {
-  fetchSlackHistory,
-  fetchSlackWorkspaceCoalesced,
-  type SlackLiveConversation,
-} from '../integrations/slackLive';
-import { slackWebClientUrl, startSlackHuddle } from '../integrations/slackNavigation';
-import { isTauriDesktop } from '../desktopWorkspace';
-import { resolveSlackToken } from '../integrations/slackToken';
-import { chatIntegrationLabel } from '../integrations/integrationActivity';
-import {
-  loadCachedWorkspace,
-  loadSlackTeamStore,
-  readCachedChannel,
-  saveWorkspaceToCache,
-  slackCacheLocationHint,
-} from '../integrations/slackOfflineCache';
-import {
-  ingestSlackWorkspaceForNotifications,
-  pushObjectivNotification,
-} from '../integrations/slackNotificationWatch';
+import {useObjectivSettings} from '../settingsContext';
+import {LUCID_SLACK, messagingPlatformLabel} from '../integrations/lucidSlack';
+import {authorHue, authorInitials, formatMessageTime, type ChatMessage} from '../integrations/messagingHistory';
+import {fetchSlackHistory, fetchSlackWorkspaceCoalesced, type SlackLiveConversation} from '../integrations/slackLive';
+import {slackWebClientUrl, startSlackHuddle} from '../integrations/slackNavigation';
+import {isElectronDesktop} from '../desktopWorkspace';
+import {resolveSlackToken} from '../integrations/slackToken';
+import {chatIntegrationLabel} from '../integrations/integrationActivity';
+import {loadCachedWorkspace, loadSlackTeamStore, readCachedChannel, saveWorkspaceToCache, slackCacheLocationHint} from '../integrations/slackOfflineCache';
+import {ingestSlackWorkspaceForNotifications, pushObjectivNotification} from '../integrations/slackNotificationWatch';
 import SlackSyncDot, { type SlackSyncVisual } from './SlackSyncDot';
-import { sortConversationsByLatest } from '../integrations/slackTsSort';
-import {
-  mergeChatMessages,
-  SLACK_CHANNEL_POLL_MS,
-} from '../integrations/slackMessageMerge';
-import { slackErrorLabel } from '../integrations/slackErrors';
+import {sortConversationsByLatest} from '../integrations/slackTsSort';
+import {mergeChatMessages, SLACK_CHANNEL_POLL_MS} from '../integrations/slackMessageMerge';
+import {slackErrorLabel} from '../integrations/slackErrors';
 
 type Thread = SlackLiveConversation;
 
@@ -91,7 +70,7 @@ export default function MessagingPanel({
   const { settings } = useObjectivSettings();
   const slackToken = resolveSlackToken(settings.chatCredential);
   const slackReady =
-    settings.chatPlatform === 'slack' && slackToken.length > 0 && isTauriDesktop();
+    settings.chatPlatform === 'slack' && slackToken.length > 0 && isElectronDesktop();
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(LIST_SECTIONS.map((s) => [s.id, false])),

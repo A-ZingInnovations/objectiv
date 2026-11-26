@@ -12,6 +12,7 @@ export type WorkbenchCommand = {
 
 export type WorkbenchActions = {
   openFolder: () => void;
+  cloneRepository: () => void;
   closeFolder: () => void;
   quitApp: () => void;
   showPanel: (p: ActivityPanel) => void;
@@ -24,6 +25,9 @@ export type WorkbenchActions = {
   addFolderToWorkspace: () => void;
   openQuickOpen: () => void;
   toggleSplit: () => void;
+  splitLeft: () => void;
+  splitDown: () => void;
+  splitUp: () => void;
   runWorkspaceTest: () => void;
   runWorkspaceBuild: () => void;
   runDockerComposeUp: () => void;
@@ -33,6 +37,8 @@ export type WorkbenchActions = {
   openFile: () => void;
   formatDocument: () => void;
   goToSymbol: () => void;
+  /** Runs an editor feature action on the active editor (rename, quickfix, …). */
+  runEditorAction?: (action: 'rename' | 'quickfix' | 'definition' | 'references' | 'find') => void;
   zoomIn: () => void;
   zoomOut: () => void;
   zoomReset: () => void;
@@ -60,7 +66,10 @@ const PANEL_SHORTCUTS: Partial<Record<ActivityPanel, string>> = {
   scm: '⌘⇧G',
   problems: '⌘⇧M',
   run: '⌘⇧D',
+  testing: '⌘⇧T',
   extensions: '⌘⇧X',
+  devcontainers: '⌘⇧C',
+  outline: '⇧⌘O',
   chat: '⌘⇧A',
   browser: '⌘⇧B',
   messages: '⌘⇧I',
@@ -141,6 +150,12 @@ export function buildWorkbenchCommands(
       run: actions.openFolder,
     },
     {
+      id: 'git.clone',
+      title: 'Clone Repository…',
+      category: 'File',
+      run: actions.cloneRepository,
+    },
+    {
       id: 'editor.format',
       title: 'Format Document',
       category: 'Editor',
@@ -155,6 +170,41 @@ export function buildWorkbenchCommands(
       run: actions.goToSymbol,
     },
     {
+      id: 'editor.rename',
+      title: 'Rename Symbol',
+      category: 'Refactor',
+      keybinding: 'F2',
+      run: () => actions.runEditorAction?.('rename'),
+    },
+    {
+      id: 'editor.quickfix',
+      title: 'Quick Fix (Code Actions)',
+      category: 'Refactor',
+      keybinding: '⌥⏎',
+      run: () => actions.runEditorAction?.('quickfix'),
+    },
+    {
+      id: 'go.toDefinition',
+      title: 'Go to Definition',
+      category: 'Go',
+      keybinding: 'F12',
+      run: () => actions.runEditorAction?.('definition'),
+    },
+    {
+      id: 'go.showReferences',
+      title: 'Show All References',
+      category: 'Go',
+      keybinding: '⇧F12',
+      run: () => actions.runEditorAction?.('references'),
+    },
+    {
+      id: 'editor.find',
+      title: 'Find in Editor…',
+      category: 'Editor',
+      keybinding: '⌘F',
+      run: () => actions.runEditorAction?.('find'),
+    },
+    {
       id: 'file.addFolder',
       title: 'Add Folder to Workspace…',
       category: 'File',
@@ -166,6 +216,24 @@ export function buildWorkbenchCommands(
       category: 'View',
       keybinding: '⌘\\',
       run: actions.toggleSplit,
+    },
+    {
+      id: 'editor.splitLeft',
+      title: 'Split Editor Left',
+      category: 'View',
+      run: actions.splitLeft,
+    },
+    {
+      id: 'editor.splitDown',
+      title: 'Split Editor Down',
+      category: 'View',
+      run: actions.splitDown,
+    },
+    {
+      id: 'editor.splitUp',
+      title: 'Split Editor Up',
+      category: 'View',
+      run: actions.splitUp,
     },
     {
       id: 'view.toggleFullScreen',
@@ -357,6 +425,9 @@ function panelTitle(panel: ActivityPanel): string {
       return 'Search';
     case 'scm':
       return 'Source Control';
+    case 'devcontainers':
+      return 'Dev Containers';    case 'outline':
+      return 'Outline';
     case 'run':
       return 'Run and Debug';
     case 'extensions':

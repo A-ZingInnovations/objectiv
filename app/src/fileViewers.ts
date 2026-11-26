@@ -131,7 +131,7 @@ export function viewerKindFromPath(path: string): ViewerKind {
   return 'text';
 }
 
-/** Needs Tauri `workspace_read_bytes` (not UTF-8 text). */
+/** Needs native `workspace_read_bytes` (not UTF-8 text). */
 export function isBinaryViewer(kind: ViewerKind): boolean {
   return (
     kind === 'pdf' ||
