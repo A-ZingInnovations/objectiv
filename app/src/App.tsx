@@ -11,8 +11,11 @@ import TabBar from './components/TabBar';
 import AgentChatPanel, { type AgentChatPanelHandle } from './components/AgentChatPanel';
 import AgentApproveModal from './components/AgentApproveModal';
 import OutputPanel from './components/OutputPanel';
-import XtermTerminal from './components/XtermTerminal';
+import XtermTerminal, { type RemoteTerminalSession } from './components/XtermTerminal';
+import ConnectHostModal, { type ConnectHostResult } from './components/ConnectHostModal';
+import RemoteFileBrowser from './components/RemoteFileBrowser';
 import RunPanel from './components/RunPanel';
+import DebugPanel from './components/DebugPanel';
 import ExtensionsPanel from './components/ExtensionsPanel';
 import TestingPanel from './components/TestingPanel';
 import OutlineView from './components/OutlineView';
@@ -137,6 +140,19 @@ import {
   resolveDiskRel,
   resolveDiskRoot,
 } from './workspaceDisk';
+import {
+  remoteTerminalLaunch,
+  type RemoteConnection,
+  type RemoteConnectionKind,
+  type RemoteFileTransferMode,
+} from './remoteConnections';
+import {
+  isRemoteEditorPath,
+  parseRemoteEditorPath,
+  readRemoteFile,
+  remoteEditorPath,
+} from './remoteFiles';
+import { loadRemoteConnectionsAsync } from './remoteConnections';
 import { isTrustedRoot, trustRoot } from './workspaceTrust';
 import { explorerPathIsDir } from './explorerDnd';
 import { appendOutput, setOutput as setGlobalOutput } from './outputChannel';
@@ -254,6 +270,49 @@ export default function App() {
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('terminal');
   const [bottomPanelMaximized, setBottomPanelMaximized] = useState(false);
   const [terminalPoppedOut, setTerminalPoppedOut] = useState(false);
+  const [connectHost, setConnectHost] = useState<{
+    kind: RemoteConnectionKind;
+    connection: RemoteConnection | null;
+    transferMode: RemoteFileTransferMode;
+  } | null>(null);
+  const [remoteSession, setRemoteSession] = useState<RemoteTerminalSession | null>(null);
+  const [remoteBrowseConn, setRemoteBrowseConn] = useState<RemoteConnection | null>(null);
+  const [remoteHostsRefreshToken, setRemoteHostsRefreshToken] = useState(0);
+  const remoteSessionSeq = useRef(1);
+
+  const handleConnectRemote = useCallback((conn: RemoteConnection) => {
+    setConnectHost({ kind: conn.kind, connection: conn, transferMode: 'session' });
+  }, []);
+
+  const handleScpRemoteHost = useCallback((conn: RemoteConnection) => {
+    setConnectHost({ kind: 'sftp', connection: conn, transferMode: 'copy' });
+  }, []);
+
+  const handleConnectHostResult = useCallback(async (result: ConnectHostResult) => {
+    setRemoteHostsRefreshToken((t) => t + 1);
+    if (result.mode === 'scp-done') {
+      appendOutput(result.message, 'Remote');
+      setBottomPanelTab('output');
+      setBottomPanelOpen(true);
+      return;
+    }
+    try {
+      const launch = await remoteTerminalLaunch(result.conn);
+      setRemoteSession({
+        id: remoteSessionSeq.current++,
+        title: result.title,
+        shell: launch.shell,
+        argv: launch.argv,
+        cwd: launch.cwd,
+      });
+      setBottomPanelTab('terminal');
+      setBottomPanelOpen(true);
+    } catch (e) {
+      appendOutput(e instanceof Error ? e.message : String(e), 'Remote');
+      setBottomPanelTab('output');
+      setBottomPanelOpen(true);
+    }
+  }, [setBottomPanelOpen]);
   const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(() => new Set());
   const [webUnsavedClose, setWebUnsavedClose] = useState<{
     path: string;
@@ -338,6 +397,32 @@ export default function App() {
 
   const openFile = useCallback(
     async (path: string, opts?: { roots?: string[] }) => {
+      if (isRemoteEditorPath(path)) {
+        const parsed = parseRemoteEditorPath(path);
+        if (!parsed) return;
+        try {
+          const conns = await loadRemoteConnectionsAsync();
+          const conn = conns.find((c) => c.id === parsed.connectionId);
+          if (!conn) {
+            alert(`No stored connection for ${parsed.connectionId}`);
+            return;
+          }
+          const content = await readRemoteFile(conn, parsed.remotePath);
+          setFiles((f) => ({ ...f, [path]: content }));
+          setDirtyPaths((d) => {
+            const next = new Set(d);
+            next.delete(path);
+            return next;
+          });
+        } catch (e) {
+          alert(`Could not open ${path}: ${e instanceof Error ? e.message : String(e)}`);
+          return;
+        }
+        pushRecentFile(path);
+        setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
+        setActiveTab(path);
+        return;
+      }
       const display = displayPath(path);
       const kind = viewerKindFromPath(display);
       const needsBinary = isBinaryViewer(kind);
@@ -604,6 +689,28 @@ export default function App() {
   const saveActiveFile = useCallback(() => {
     const path = activeTab;
     if (!path || path.startsWith('diff:')) return;
+    if (isRemoteEditorPath(path)) {
+      const content = filesRef.current[path];
+      if (content === undefined) return;
+      void (async () => {
+        try {
+          const parsed = parseRemoteEditorPath(path);
+          const conns = await loadRemoteConnectionsAsync();
+          const conn = conns.find((c) => c.id === parsed?.connectionId);
+          if (!conn || !parsed) throw new Error('No stored connection for this remote file');
+          const { writeRemoteFile } = await import('./remoteFiles');
+          await writeRemoteFile(conn, parsed.remotePath, content);
+          setDirtyPaths((d) => {
+            const next = new Set(d);
+            next.delete(path);
+            return next;
+          });
+        } catch (e) {
+          alert(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      })();
+      return;
+    }
     if (!isDiskPath(path)) {
       alert('Save this buffer into a workspace folder first (untitled files are in-memory only).');
       return;
@@ -2521,6 +2628,11 @@ export default function App() {
                 activeEditorPath={activeTab}
                 onActivateEditor={(p) => setActiveTab(p)}
                 onCloseEditor={(p) => void requestCloseTab(p)}
+                onConnectRemote={handleConnectRemote}
+                onScpRemoteHost={handleScpRemoteHost}
+                remoteHostsRefreshToken={remoteHostsRefreshToken}
+                onConnectHost={(kind) => setConnectHost({ kind, connection: null, transferMode: 'session' })}
+                onBrowseRemote={(conn) => setRemoteBrowseConn(conn)}
                 browserSection={
                   <BrowserPanelCompact
                     sessions={browserWb.sessionList}
@@ -2606,12 +2718,19 @@ export default function App() {
               />
             )}
             {panel === 'run' && (
-              <RunPanel
-                workspaceRoot={activeRoot}
-                activePath={activeTab}
-                breakpoints={debugBreakpoints}
-                onOpenFolder={() => void openFolder()}
-              />
+              <>
+                <RunPanel
+                  workspaceRoot={activeRoot}
+                  activePath={activeTab}
+                  breakpoints={debugBreakpoints}
+                  onOpenFolder={() => void openFolder()}
+                />
+                <DebugPanel
+                  workspaceRoot={activeRoot}
+                  program={activeTab ?? undefined}
+                  embedded
+                />
+              </>
             )}
             {panel === 'testing' && (
               <TestingPanel
@@ -2622,7 +2741,15 @@ export default function App() {
             {panel === 'outline' && (
               <OutlineView workspaceRoot={activeRoot ?? null} path={activeTab ?? null} />
             )}
-            {panel === 'devcontainers' && <DevContainersPanel />}
+            {panel === 'devcontainers' && (
+              <DevContainersPanel
+                workspaceFiles={workspaceFileRels}
+                files={files}
+                activeRoot={activeRoot}
+                onRunCommand={(command) => void runWorkspaceScript(command)}
+                onOpenFile={(rel) => void openFile(encodeDiskPath(activeRootIndex, rel))}
+              />
+            )}
             {panel === 'extensions' && <ExtensionsPanel />}
             {panel === 'llm' && <LlmSuitePanel />}
             {panel === 'stats' && <LiveStatsPanel workspaceRoot={activeRoot ?? null} />}
@@ -2907,7 +3034,7 @@ export default function App() {
           onPopInTerminal={() => void popInTerminal()}
           terminal={
             terminalPoppedOut ? null : (
-              <XtermTerminal key={activeRoot ?? 'none'} workspaceRoot={activeRoot} embedded />
+              <XtermTerminal key={activeRoot ?? 'none'} workspaceRoot={activeRoot} embedded remoteSession={remoteSession} onRemoteKill={(id) => setRemoteSession((s) => (s && s.id === id ? null : s))} />
             )
           }
           problems={
@@ -3054,6 +3181,35 @@ export default function App() {
               .finally(() => setAgentApprovalBusy(false));
           }}
           onOpenDiff={() => openDiffTab(agentPending)}
+        />
+      )}
+      {connectHost && (
+        <ConnectHostModal
+          initialKind={connectHost.kind}
+          initialConnection={connectHost.connection}
+          initialTransferMode={connectHost.transferMode}
+          onClose={() => setConnectHost(null)}
+          onConnected={(result) => void handleConnectHostResult(result)}
+          onSaved={() => setRemoteHostsRefreshToken((t) => t + 1)}
+        />
+      )}
+      {remoteBrowseConn && (
+        <RemoteFileBrowser
+          conn={remoteBrowseConn}
+          onOpenFile={(remotePath, content) => {
+            const path = remoteEditorPath(remoteBrowseConn, remotePath);
+            setFiles((f) => ({ ...f, [path]: content }));
+            setDirtyPaths((d) => {
+              const next = new Set(d);
+              next.delete(path);
+              return next;
+            });
+            pushRecentFile(path);
+            setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
+            setActiveTab(path);
+            setRemoteBrowseConn(null);
+          }}
+          onClose={() => setRemoteBrowseConn(null)}
         />
       )}
       {trustPrompt && (
