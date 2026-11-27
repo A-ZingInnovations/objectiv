@@ -168,6 +168,20 @@ export default function DevContainersPanel({
                         Init
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="devc-btn"
+                      disabled={busy}
+                      title="Attach terminal to running container"
+                      onClick={() => {
+                        const cmds = activeRoot ? devContainerCommands(spec, activeRoot) : null;
+                        if (cmds?.exec) {
+                          void onRunCommand?.(cmds.exec, `Dev container: attach ${spec.id}`);
+                        }
+                      }}
+                    >
+                      Attach
+                    </button>
                   </div>
                 ) : (
                   <p className="devc-hint">Open a workspace folder to run this container.</p>

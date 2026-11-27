@@ -11,6 +11,7 @@ export type LineNumbersSetting = 'on' | 'off' | 'relative';
 export type RenderWhitespaceSetting = 'none' | 'boundary' | 'selection' | 'all';
 export type CursorBlinkingSetting = 'blink' | 'smooth' | 'phase' | 'solid';
 export type CursorStyleSetting = 'line' | 'block' | 'underline';
+export type MultiCursorModifierSetting = 'altKey' | 'ctrlKey' | 'metaKey';
 export type AutoSaveSetting = 'off' | 'afterDelay' | 'onFocusChange';
 
 /** Chat platforms Objectiv allows the user to connect. */
@@ -119,6 +120,8 @@ export type ObjectivSettings = {
   renderWhitespace: RenderWhitespaceSetting;
   cursorBlinking: CursorBlinkingSetting;
   cursorStyle: CursorStyleSetting;
+  multiCursorModifier: MultiCursorModifierSetting;
+  folding: boolean;
   smoothScrolling: boolean;
   mouseWheelZoom: boolean;
   bracketPairColorization: boolean;
@@ -449,6 +452,8 @@ export function defaultSettings(): ObjectivSettings {
     renderWhitespace: 'selection',
     cursorBlinking: 'blink',
     cursorStyle: 'line',
+    multiCursorModifier: 'altKey',
+    folding: true,
     smoothScrolling: true,
     mouseWheelZoom: true,
     bracketPairColorization: true,
@@ -623,6 +628,8 @@ export function mergeSettings(parsed: Partial<ObjectivSettings>): ObjectivSettin
       base.cursorBlinking,
     ),
     cursorStyle: asEnum(parsed.cursorStyle, ['line', 'block', 'underline'] as const, base.cursorStyle),
+    multiCursorModifier: asEnum(parsed.multiCursorModifier, ['altKey', 'ctrlKey', 'metaKey'] as const, base.multiCursorModifier),
+    folding: asBool(parsed.folding, base.folding),
     smoothScrolling: asBool(parsed.smoothScrolling, base.smoothScrolling),
     mouseWheelZoom: asBool(parsed.mouseWheelZoom, base.mouseWheelZoom),
     bracketPairColorization: asBool(parsed.bracketPairColorization, base.bracketPairColorization),

@@ -19,6 +19,7 @@ type Props = FileTreeProps & {
   browserSection?: ReactNode;
   onConnectRemote?: (conn: RemoteConnection) => void;
   onScpRemoteHost?: (conn: RemoteConnection) => void;
+  onBrowseRemote?: (conn: RemoteConnection) => void;
   remoteHostsRefreshToken?: number;
 };
 
@@ -146,6 +147,7 @@ export default function ExplorerSidePanel({
             onAddHost={fileTreeProps.onConnectHost}
             onConnect={onConnectRemote}
             onScpCopy={onScpRemoteHost}
+            onBrowse={fileTreeProps.onBrowseRemote}
             refreshToken={remoteHostsRefreshToken}
           />
         );

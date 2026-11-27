@@ -9,6 +9,7 @@ import { useIsElectronDesktop } from '../useIsElectronDesktop';
 type Props = {
   onAddHost?: (kind: 'ssh' | 'sftp') => void;
   onConnect?: (conn: RemoteConnection) => void;
+  onBrowse?: (conn: RemoteConnection) => void;
   onScpCopy?: (conn: RemoteConnection) => void;
   /** Bump when hosts were saved from the modal. */
   refreshToken?: number;
@@ -28,6 +29,7 @@ function RemoteHostList({
   onScpCopy,
   onAdd,
   onRemove,
+  onBrowse,
 }: {
   title: string;
   kind: 'ssh' | 'sftp';
@@ -37,6 +39,7 @@ function RemoteHostList({
   onScpCopy?: (conn: RemoteConnection) => void;
   onAdd?: (kind: 'ssh' | 'sftp') => void;
   onRemove: (id: string) => void;
+  onBrowse?: (conn: RemoteConnection) => void;
 }) {
   const filtered = hosts.filter((h) => h.kind === kind);
 
@@ -89,6 +92,18 @@ function RemoteHostList({
                     <span className="codicon codicon-copy" aria-hidden />
                   </button>
                 )}
+                {onBrowse && (
+                  <button
+                    type="button"
+                    className="scm-icon-btn"
+                    title="Browse remote files"
+                    aria-label={`Browse files on ${conn.name}`}
+                    disabled={disabled}
+                    onClick={() => onBrowse(conn)}
+                  >
+                    <span className="codicon codicon-file-directory" aria-hidden />
+                  </button>
+                )}
                 <button
                   type="button"
                   className="scm-icon-btn"
@@ -113,6 +128,7 @@ export default function ExplorerRemoteSection({
   onAddHost,
   onConnect,
   onScpCopy,
+  onBrowse,
   refreshToken = 0,
 }: Props) {
   const desktop = useIsElectronDesktop();
@@ -161,6 +177,7 @@ export default function ExplorerRemoteSection({
             onConnect={onConnect}
             onAdd={onAddHost}
             onRemove={handleRemove}
+            onBrowse={onBrowse}
           />
           <RemoteHostList
             title="SFTP / SCP"
@@ -171,6 +188,7 @@ export default function ExplorerRemoteSection({
             onScpCopy={onScpCopy}
             onAdd={onAddHost}
             onRemove={handleRemove}
+            onBrowse={onBrowse}
           />
         </>
       )}

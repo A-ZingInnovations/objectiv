@@ -4,7 +4,7 @@
  * Drives Node (CDP) and Python (DAP) debug sessions via desktopWorkspace.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   debugCdpConnect,
   debugCdpEvaluate,
@@ -30,6 +30,9 @@ import {
   debugDapLaunchPython,
   debugStop,
 } from '../desktopWorkspace';
+import { scanWorkspace, runShellInWorkspace } from '../desktopWorkspace';
+import { detectPythonArtifacts } from '../pythonTasks';
+import { detectDockerArtifacts } from '../dockerTasks';
 import SideBarSection from './SideBarSection';
 
 type CdpFrame = {
@@ -71,7 +74,8 @@ type DebugSessionState = {
 type Props = {
   workspaceRoot: string | null;
   embedded?: boolean;
-  program?: string; // default program to debug
+  /** @deprecated Prefer stack-based detection. Default program to debug. */
+  program?: string;
 };
 
 export default function DebugPanel({
@@ -86,59 +90,139 @@ export default function DebugPanel({
   const [busy, setBusy] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<number | null>(null);
   const consoleInputRef = useRef<HTMLInputElement>(null);
+  const [debugOptions, setDebugOptions] = useState<{
+    node: boolean;
+    python: boolean;
+    docker: boolean;
+    pythonEntries: string[];
+    dockerfiles: string[];
+    composeFiles: string[];
+  } | null>(null);
+
+  // ---- Detect stack-based debug options ----
+  const detectOptions = useCallback(async () => {
+    if (!workspaceRoot) return;
+    try {
+      const files = await scanWorkspace(workspaceRoot);
+      const py = detectPythonArtifacts(files);
+      const docker = detectDockerArtifacts(files);
+      setDebugOptions({
+        node: files.some((f) => f.endsWith('.js') || f.endsWith('.mjs') || f.endsWith('.ts')),
+        python: py.isPythonProject,
+        docker: docker.dockerfiles.length > 0 || docker.composeFiles.length > 0,
+        pythonEntries: py.entryScripts,
+        dockerfiles: docker.dockerfiles,
+        composeFiles: docker.composeFiles,
+      });
+    } catch {
+      /* scan may fail in non-desktop or restricted environments */
+    }
+  }, [workspaceRoot]);
+
+  useEffect(() => {
+    void detectOptions();
+  }, [workspaceRoot, detectOptions]);
 
   const log = useCallback((text: string) => {
     setOutput((prev) => [...prev, text]);
   }, []);
 
-  // ---- Launch ----
-
-  const launchNode = useCallback(async () => {
-    if (!workspaceRoot || !program) return;
-    setBusy(true);
-    try {
-      const result = await debugCdpLaunchNode(workspaceRoot, program);
-      setSession({
-        id: result.sessionId,
-        type: 'node',
-        title: `Node · ${program}`,
-        port: result.inspectPort,
-        running: true,
-      });
-      log(result.hint);
+  const launchNodeFor = useCallback(
+    async (prog: string) => {
+      if (!workspaceRoot) return;
+      setBusy(true);
       try {
-        await debugCdpConnect(result.sessionId, `ws://127.0.0.1:${result.inspectPort}`);
-      } catch {
-        /* connect may be retried manually */
+        const result = await debugCdpLaunchNode(workspaceRoot, prog);
+        setSession({
+          id: result.sessionId,
+          type: 'node',
+          title: `Node · ${prog}`,
+          port: result.inspectPort,
+          running: true,
+        });
+        log(result.hint);
+        try {
+          await debugCdpConnect(result.sessionId, `ws://127.0.0.1:${result.inspectPort}`);
+        } catch {
+          /* connect may be retried manually */
+        }
+      } catch (e) {
+        log(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
       }
-    } catch (e) {
-      log(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [workspaceRoot, program]);
+    },
+    [workspaceRoot],
+  );
 
-  const launchPython = useCallback(async () => {
+  const launchPythonFor = useCallback(
+    async (prog: string) => {
+      if (!workspaceRoot) return;
+      setBusy(true);
+      try {
+        const result = await debugDapLaunchPython(workspaceRoot, { program: prog });
+        setSession({
+          id: result.sessionId,
+          type: 'python',
+          title: `Python · ${prog}`,
+          port: result.inspectPort,
+          running: true,
+        });
+        log(result.hint);
+        await debugDapConfigurationDone(result.sessionId);
+        await debugDapSetBreakpoints(result.sessionId, prog, []);
+      } catch (e) {
+        log(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [workspaceRoot],
+  );
+
+  // ---- Stack-based option launchers ----
+
+  const launchNodeOption = useCallback(async () => {
     if (!workspaceRoot || !program) return;
+    void launchNodeFor(program);
+  }, [workspaceRoot, program, launchNodeFor]);
+
+  const launchPythonOption = useCallback(async (prog: string) => {
+    void launchPythonFor(prog);
+  }, [launchPythonFor]);
+
+  const launchDockerBuild = useCallback(async (df: string) => {
+    if (!workspaceRoot) return;
     setBusy(true);
     try {
-      const result = await debugDapLaunchPython(workspaceRoot, { program });
-      setSession({
-        id: result.sessionId,
-        type: 'python',
-        title: `Python · ${program}`,
-        port: result.inspectPort,
-        running: true,
-      });
-      log(result.hint);
-      await debugDapConfigurationDone(result.sessionId);
-      await debugDapSetBreakpoints(result.sessionId, program, []);
+      const tag = df.replace(/[^a-zA-Z0-9.-]/g, '-').toLowerCase();
+      const out = await runShellInWorkspace(
+        workspaceRoot,
+        `docker build -f ${df.replace(/'/g, `'\\''`)} -t ${tag} .`,
+      );
+      log(out);
     } catch (e) {
       log(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, [workspaceRoot, program]);
+  }, [workspaceRoot]);
+
+  const launchDockerComposeUp = useCallback(async (cf: string) => {
+    if (!workspaceRoot) return;
+    setBusy(true);
+    try {
+      const out = await runShellInWorkspace(
+        workspaceRoot,
+        `docker compose -f ${cf.replace(/'/g, `'\\''`)} up -d --build`,
+      );
+      log(out);
+    } catch (e) {
+      log(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [workspaceRoot]);
 
   const stop = useCallback(async () => {
     if (!session) return;
@@ -386,35 +470,94 @@ export default function DebugPanel({
 
       {!session && (
         <div className="debug-launch">
-          <p className="debug-hint">
-            No active debug session. Open folder and choose a program to debug.
-          </p>
-          {workspaceRoot && program && (
+          {debugOptions ? (
             <>
-              <button
-                type="button"
-                className="debug-btn primary"
-                disabled={busy}
-                onClick={() => void launchNode()}
-              >
-                <span className="codicon codicon-debug-alt" aria-hidden />
-                Launch Node: {program}
-              </button>
-              <button
-                type="button"
-                className="debug-btn"
-                disabled={busy}
-                onClick={() => void launchPython()}
-              >
-                <span className="codicon codicon-debug-alt" aria-hidden />
-                Launch Python: {program}
-              </button>
+              <p className="debug-hint">
+                Detected debuggable runtimes — choose one to start:
+              </p>
+              {debugOptions.node && (
+                <button
+                  type="button"
+                  className="debug-btn primary"
+                  disabled={busy || !program}
+                  onClick={() => void launchNodeOption()}
+                >
+                  <span className="codicon codicon-debug-alt" aria-hidden />
+                  Launch Node: {program}
+                </button>
+              )}
+              {debugOptions.python && (
+                <>
+                  {debugOptions.pythonEntries.length > 0 ? (
+                    debugOptions.pythonEntries.map((entry) => (
+                      <button
+                        key={entry}
+                        type="button"
+                        className="debug-btn"
+                        disabled={busy}
+                        onClick={() => void launchPythonOption(entry)}
+                      >
+                        <span className="codicon codicon-debug-alt" aria-hidden />
+                        Launch Python: {entry}
+                      </button>
+                    ))
+                  ) : (
+                    <button
+                      type="button"
+                      className="debug-btn"
+                      disabled={busy || !program}
+                      onClick={() => void (program && launchPythonOption(program))}
+                    >
+                      <span className="codicon codicon-debug-alt" aria-hidden />
+                      Launch Python
+                    </button>
+                  )}
+                </>
+              )}
+              {debugOptions.dockerfiles.length > 0 && (
+                <>
+                  {debugOptions.dockerfiles.map((df) => (
+                    <button
+                      key={df}
+                      type="button"
+                      className="debug-btn"
+                      disabled={busy || !df}
+                      onClick={() => void (df && launchDockerBuild(df))}
+                    >
+                      <span className="codicon codicon-dockerfile" aria-hidden />
+                      Docker: build ({df})
+                    </button>
+                  ))}
+                </>
+              )}
+              {debugOptions.composeFiles.length > 0 && (
+                <>
+                  {debugOptions.composeFiles.map((cf) => (
+                    <button
+                      key={cf}
+                      type="button"
+                      className="debug-btn"
+                      disabled={busy || !cf}
+                      onClick={() => void (cf && launchDockerComposeUp(cf))}
+                    >
+                      <span className="codicon codicon-docker" aria-hidden />
+                      Compose: up ({cf})
+                    </button>
+                  ))}
+                </>
+              )}
+              {!debugOptions.node && !debugOptions.python && !debugOptions.docker && (
+                <p className="debug-hint">
+                  No debuggable runtime detected (no .js/.ts, Python, or Docker files).
+                </p>
+              )}
             </>
-          )}
-          {workspaceRoot && !program && (
-            <p className="debug-hint">
-              Open a file first, or set a default debug program in workspace settings.
-            </p>
+          ) : (
+            <>
+              <p className="debug-hint">
+                Scanning workspace for debuggable runtimes…
+              </p>
+            </>
           )}
         </div>
       )}

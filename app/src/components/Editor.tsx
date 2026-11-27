@@ -8,7 +8,7 @@
  * - Terminal link decoration
  */
 
-import {useEffect, useRef, type MutableRefObject} from 'react';
+import {useEffect, useRef, useState, type MutableRefObject} from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import * as Monaco from 'monaco-editor';
 import {ensurePythonLsp, ensureTypeScriptLsp} from '../lspClient';
@@ -43,6 +43,8 @@ export type EditorSettingsProps = {
   renderWhitespace?: RenderWhitespaceSetting;
   cursorBlinking?: CursorBlinkingSetting;
   cursorStyle?: CursorStyleSetting;
+  multiCursorModifier?: 'altKey' | 'ctrlKey' | 'metaKey';
+  folding?: boolean;
   smoothScrolling?: boolean;
   mouseWheelZoom?: boolean;
   bracketPairColorization?: boolean;
@@ -88,6 +90,8 @@ export default function CodeEditor({
   renderWhitespace = 'selection',
   cursorBlinking = 'blink',
   cursorStyle = 'line',
+  multiCursorModifier = 'altKey' as 'altKey' | 'ctrlKey' | 'metaKey',
+  folding = true,
   smoothScrolling = true,
   mouseWheelZoom = true,
   bracketPairColorization = true,
@@ -108,7 +112,73 @@ export default function CodeEditor({
   const llmAssistDisposeRef = useRef<(() => void) | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
+  const [breadcrumbs, setBreadcrumbs] = useState<{ label: string; range: Monaco.Range }[]>([]);
   const ignoreEmptyUntilRef = useRef(0);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !workspaceRoot || !isDiskPath(path)) {
+      setBreadcrumbs([]);
+      return;
+    }
+    const rel = resolveDiskRel(path);
+    if (!rel) {
+      setBreadcrumbs([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { ensureTypeScriptLsp: ensure } = await import('../lspClient');
+      const client = await ensure(workspaceRoot);
+      if (!client || cancelled) return;
+      try {
+        const result = await client.documentSymbols(rel);
+        if (cancelled) return;
+        const symbols = Array.isArray(result) ? result : [];
+        const crumbs = buildDocumentSymbolBreadcrumbs(symbols, editor);
+        if (cancelled) return;
+        setBreadcrumbs(crumbs);
+      } catch {
+        if (!cancelled) setBreadcrumbs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [path, workspaceRoot]);
+
+  const buildDocumentSymbolBreadcrumbs = (
+    symbols: any[],
+    editor: Monaco.editor.IStandaloneCodeEditor,
+  ): { label: string; range: Monaco.Range }[] => {
+    const crumbs: { label: string; range: Monaco.Range }[] = [];
+    const pos = editor.getPosition();
+    const line = pos?.lineNumber ?? 1;
+
+    const findAtLine = (nodes: any[], targetLine: number): any | null => {
+      for (const node of nodes) {
+        const range = node.range;
+        if (!range) continue;
+        const startLine = range.startLineNumber;
+        const endLine = range.endLineNumber ?? startLine;
+        if (targetLine >= startLine && targetLine <= endLine) {
+          const child = findAtLine(node.children ?? [], targetLine);
+          return child ?? node;
+        }
+      }
+      return null;
+    };
+
+    let node = findAtLine(symbols, line);
+    while (node) {
+      crumbs.unshift({
+        label: node.name ?? node.label ?? 'Symbol',
+        range: new Monaco.Range(node.range.startLineNumber, 1, node.range.startLineNumber, 1),
+      });
+      node = node.parent;
+    }
+    return crumbs;
+  };
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -272,7 +342,8 @@ export default function CodeEditor({
       renderWhitespace,
       cursorBlinking,
       cursorStyle,
-      smoothScrolling,
+      multiCursorModifier: multiCursorModifier === 'altKey' ? 'alt' : 'ctrlCmd',
+      folding,
       mouseWheelZoom,
       bracketPairColorization: { enabled: bracketPairColorization },
       stickyScroll: { enabled: stickyScroll },
@@ -435,55 +506,77 @@ export default function CodeEditor({
   }, [path, language, llmAssist, llmInlineCompletions, llmInstantFixes]);
 
   return (
-    <div className="code-editor-host">
-      <Editor
-        key={path}
-        height="100%"
-        language={language}
-        theme={theme}
-        value={value}
-        onChange={(v) => {
-          const next = v ?? '';
-          const current = valueRef.current;
-          // Ignore no-op / mount echoes so we don't wipe freshly loaded disk content.
-          if (next === current) return;
-          // Monaco often emits '' while the model is swapped; never clobber real text with that.
-          if (next === '' && current.length > 0) return;
-          if (next === '' && Date.now() < ignoreEmptyUntilRef.current) return;
-          onChange(next);
-        }}
-        onMount={onMount}
-        options={{
-          glyphMargin: true,
-          fontSize,
-          fontFamily,
-          fontLigatures,
-          lineHeight: lineHeight > 0 ? lineHeight : undefined,
-          wordWrap,
-          minimap: { enabled: minimap },
-          lineNumbers,
-          renderWhitespace,
-          cursorBlinking,
-          cursorStyle,
-          smoothScrolling,
-          mouseWheelZoom,
-          bracketPairColorization: { enabled: bracketPairColorization },
-          stickyScroll: { enabled: stickyScroll },
-          tabSize,
-          insertSpaces,
-          detectIndentation,
-          autoIndent: 'full',
-          formatOnPaste,
-          formatOnType,
-          guides: { indentation: true, bracketPairs: true },
-          quickSuggestions: {
-            other: true,
-            comments: true,
-            strings: true,
-          },
-        }}
-      />
-    </div>
+    <>
+      {breadcrumbs.length > 0 && (
+        <div className="breadcrumbs">
+          {breadcrumbs.map((crumb, i) => (
+            <span key={i}>
+              {i > 0 && <span className="breadcrumb-sep"> › </span>}
+              <span
+                className="breadcrumb-item"
+                title={crumb.label}
+                onClick={() => {
+                  const editor = editorRef.current;
+                  if (editor) editor.setPosition({ lineNumber: crumb.range.startLineNumber, column: 1 });
+                }}
+              >
+                {crumb.label}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="code-editor-host">
+        <Editor
+          key={path}
+          height="100%"
+          language={language}
+          theme={theme}
+          value={value}
+          onChange={(v) => {
+            const next = v ?? '';
+            const current = valueRef.current;
+            // Ignore no-op / mount echoes so we don't wipe freshly loaded disk content.
+            if (next === current) return;
+            // Monaco often emits '' while the model is swapped; never clobber real text with that.
+            if (next === '' && current.length > 0) return;
+            if (next === '' && Date.now() < ignoreEmptyUntilRef.current) return;
+            onChange(next);
+          }}
+          onMount={onMount}
+          options={{
+            glyphMargin: true,
+            fontSize,
+            fontFamily,
+            fontLigatures,
+            lineHeight: lineHeight > 0 ? lineHeight : undefined,
+            wordWrap,
+            minimap: { enabled: minimap },
+            lineNumbers,
+            renderWhitespace,
+            cursorBlinking,
+            cursorStyle,
+            multiCursorModifier: multiCursorModifier === 'altKey' ? 'alt' : 'ctrlCmd',
+            folding,
+            mouseWheelZoom,
+            bracketPairColorization: { enabled: bracketPairColorization },
+            stickyScroll: { enabled: stickyScroll },
+            tabSize,
+            insertSpaces,
+            detectIndentation,
+            autoIndent: 'full',
+            formatOnPaste,
+            formatOnType,
+            guides: { indentation: true, bracketPairs: true },
+            quickSuggestions: {
+              other: true,
+              comments: true,
+              strings: true,
+            },
+          }}
+        />
+      </div>
+    </>
   );
 }
 
